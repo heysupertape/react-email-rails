@@ -24,7 +24,7 @@ describe("react-email-rails-config", () => {
       [
         `import { defineConfig } from "vite"`,
         `import { reactEmailRails } from ${JSON.stringify(
-          pathToFileURL(join(pkgRoot, "src/index.ts")).href,
+          pathToFileURL(join(pkgRoot, "dist/index.js")).href,
         )}`,
         ``,
         `export default defineConfig({`,
