@@ -1,0 +1,2 @@
+module ReactEmailRails::RenderModes
+end

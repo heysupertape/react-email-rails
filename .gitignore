@@ -1,0 +1,13 @@
+/.bundle/
+/.context/
+/coverage/
+/node_modules/
+/pkg/
+/tmp/
+/vite/dist/
+/vite/node_modules/
+
+.DS_Store
+*.gem
+*.log
+*.tgz
