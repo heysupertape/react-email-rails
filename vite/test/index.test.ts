@@ -4,6 +4,21 @@ import { describe, expect, it } from "vitest"
 import { reactEmailRails } from "../src/index"
 import { type EmailRegistry, renderEmail, serve, toComponentName } from "../src/runtime"
 
+type EmailConfig = {
+  builder: object
+  environments: {
+    email: {
+      resolve?: { noExternal?: boolean }
+      build: {
+        ssr?: boolean
+        outDir?: string
+        emptyOutDir?: boolean
+        rollupOptions?: { input?: string; output?: { entryFileNames?: string } }
+      }
+    }
+  }
+}
+
 const Welcome: React.ComponentType<Record<string, unknown>> = (props) =>
   React.createElement("p", null, `Hi ${String(props.name)}`)
 
@@ -205,37 +220,34 @@ describe("reactEmailRails plugin", () => {
     expect(source).toContain('import.meta.glob("/app/javascript/emails/**/*{.tsx,.jsx}")')
   })
 
-  it("configures the build only for the email mode", () => {
+  it("registers the email build environment and opts into building it", () => {
     const plugin = reactEmailRails()
-    const configHook = plugin.config as (
-      config: object,
-      env: { mode: string },
-    ) => { build?: object } | undefined
+    const config = (plugin.config as () => EmailConfig)()
 
-    expect(configHook({}, { mode: "production" })).toBeUndefined()
-    expect(configHook({}, { mode: "email" })?.build).toMatchObject({
+    expect(config.builder).toEqual({})
+    expect(config.environments.email.build).toMatchObject({
+      ssr: true,
       outDir: "tmp/react-email-rails",
+      emptyOutDir: true,
+    })
+    expect(config.environments.email.build.rollupOptions).toMatchObject({
+      input: "virtual:react-email-rails/main",
+      output: { entryFileNames: "emails.js" },
     })
   })
 
   it("externalizes dependencies for the email build by default", () => {
     const plugin = reactEmailRails()
-    const configHook = plugin.config as (
-      config: object,
-      env: { mode: string },
-    ) => { ssr?: object } | undefined
+    const config = (plugin.config as () => EmailConfig)()
 
-    expect(configHook({}, { mode: "email" })?.ssr).toBeUndefined()
+    expect(config.environments.email.resolve).toBeUndefined()
   })
 
   it("inlines dependencies for the email build when standalone is set", () => {
     const plugin = reactEmailRails({ standalone: true })
-    const configHook = plugin.config as (
-      config: object,
-      env: { mode: string },
-    ) => { ssr?: object } | undefined
+    const config = (plugin.config as () => EmailConfig)()
 
-    expect(configHook({}, { mode: "email" })?.ssr).toMatchObject({ noExternal: true })
+    expect(config.environments.email.resolve).toMatchObject({ noExternal: true })
   })
 
   it("accepts an emails string shorthand for the directory", () => {

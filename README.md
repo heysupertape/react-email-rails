@@ -22,9 +22,9 @@ Building HTML emails is painfully archaic. [React Email](https://react.email) is
 
 ## How?
 
-**In development,** the gem renders components live through Vite's dev pipeline, so your emails get the same module resolution and transforms as the rest of your frontend. No build step — each render picks up your latest edits.
+**In development,** the gem renders components live through Vite's dev pipeline, so your emails get the same module resolution and transforms as the rest of your frontend.
 
-**In production,** Vite builds a server-side email bundle ahead of time (`vite build --mode email`). The gem runs that bundle with Node, sends props to the requested component, and receives rendered HTML and plain text back.
+**In production,** Vite builds a server-side email bundle ahead of time. The plugin adds a dedicated `email` build environment, so your normal `vite build` emits the bundle alongside your client assets.
 
 Delivery, headers, multipart parts, previews, queues, and callbacks all stay normal Action Mailer. If rendering fails, no email is sent and `ReactEmailRails::RenderError` is raised.
 
@@ -127,7 +127,7 @@ class AccountMailer < ApplicationMailer
 end
 ```
 
-That's it — it now delivers like any other Action Mailer message. In development it renders live; for production, you'll build the email bundle first (see [Deployment](#deployment)).
+That's it — it now delivers like any other Action Mailer message. In development it renders live; in production it renders from the bundle your `vite build` produces (see [Deployment](#deployment)).
 
 ## Usage
 
@@ -364,7 +364,7 @@ Persistent failures should return `ok: false` with an error string. Each respons
 
 ### Vite Configuration
 
-The `reactEmailRails()` plugin (added in [Quick Start](#quick-start)) discovers `.tsx` and `.jsx` files in `app/javascript/emails` and builds the email SSR bundle only when Vite runs in `email` mode. The defaults suit most apps; the options below customize them.
+The `reactEmailRails()` plugin (added in [Quick Start](#quick-start)) discovers `.tsx` and `.jsx` files in `app/javascript/emails` and adds a dedicated `email` build environment that emits the SSR bundle during a normal `vite build` (see [Deployment](#deployment)). The defaults suit most apps; the options below customize them.
 
 #### Plugin Options
 
@@ -408,13 +408,13 @@ Component names come from the Vite directory layout (see [Component Names](#comp
 
 ## Deployment
 
-Your normal `vite build` does **not** emit the email bundle — the plugin only produces it in `email` mode. Add a separate build step to your deploy, run on every process that renders mail (in addition to your usual asset build):
+The plugin registers a dedicated `email` [build environment](https://vite.dev/guide/api-environment), so your normal `vite build` emits the email bundle in the same pass as your client assets — no separate build step. It writes `tmp/react-email-rails/emails.js`, which the default production `render_command` runs with Node.
 
-```sh
-vite build --mode email
-```
+The only requirement is that `vite build` runs on every process that renders mail, the same as for the rest of your assets. With [`rails_vite`](https://github.com/skryukov/rails_vite/) that already happens during `assets:precompile`, so there's nothing extra to wire up. The bundle is required, not an optimization: if it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent.
 
-This writes `tmp/react-email-rails/emails.js`, which the default production `render_command` runs with Node. It's required, not an optimization: if the bundle is missing, renders raise `ReactEmailRails::RenderError` and no mail is sent. (Development needs no build — components render live through Vite.)
+To emit the bundle without a dedicated command, the plugin opts your project into Vite's [whole-app build](https://vite.dev/guide/api-environment): a plain `vite build` builds every configured environment in one pass. For a standard client-only app that's just your client assets plus the `email` bundle. If you've defined other Vite environments (say a custom `ssr` build), they build in the same pass too, so you can drop any separate build command you ran for them.
+
+If your Vite config defines a custom `builder.buildApp`, make sure it builds `builder.environments.email` alongside your other environments. Custom builders replace Vite's default whole-app build orchestration, so the email bundle is emitted only if your builder includes that environment.
 
 By default the bundle externalizes `react`, `react-dom`, `@react-email/render`, and the runtime, so the renderer needs `node_modules` present alongside `tmp/react-email-rails/emails.js` at runtime. To deploy the bundle without `node_modules`, set `standalone: true` on the plugin to inline those dependencies into a self-contained bundle.
 
