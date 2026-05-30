@@ -2,12 +2,12 @@ module ReactEmailRails::ActionMailer
   extend(ActiveSupport::Concern)
 
   prepended do
-    class_attribute(:react_email_use_assigns, default: false)
+    class_attribute(:react_email_use_instance_props, default: false)
   end
 
   class_methods do
-    def use_react_assigns
-      self.react_email_use_assigns = true
+    def use_react_instance_props
+      self.react_email_use_instance_props = true
     end
   end
 

@@ -101,7 +101,7 @@ vite build --mode email
 ```ruby
 mail react: { user: }, to:, subject:               # infer component, explicit props
 mail react: "users/welcome", props: { user: }, ... # explicit component + props
-mail react: true, to:, subject:                     # infer component + instance assigns
+mail react: true, to:, subject:                     # infer component + instance props
 ```
 
 ### Component Names
@@ -154,11 +154,11 @@ mail react: "accounts/welcome", props: {
 }, to:, subject:
 ```
 
-Use `react: true` to send mailer assigns as props:
+Use `react: true` to send mailer instance variables as props:
 
 ```ruby
 class AccountMailer < ApplicationMailer
-  use_react_assigns
+  use_react_instance_props
 
   def created
     @account = params.fetch(:account)
@@ -167,7 +167,7 @@ class AccountMailer < ApplicationMailer
 end
 ```
 
-Framework internals and `params` are excluded from assign props. Without `use_react_assigns`, `react: true` still infers the component and renders it with no props, which is handy for emails that take no props at all.
+Framework internals and `params` are excluded from instance props. Without `use_react_instance_props`, `react: true` still infers the component and renders it with no props, which is handy for emails that take no props at all.
 
 ### Render Options
 

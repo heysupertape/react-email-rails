@@ -6,8 +6,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["Supertape"]
   spec.email = ["hi@supertape.com"]
 
-  spec.summary = "React Email integration for Rails"
-  spec.description = "Send emails using React Email components from Rails with Action Mailer."
+  spec.summary = "Build and send emails using React and Rails"
+  spec.description = "Seamless integration between Action Mailer and React Email components."
   spec.homepage = "https://github.com/heysupertape/react-email-rails"
   spec.license = "MIT"
 

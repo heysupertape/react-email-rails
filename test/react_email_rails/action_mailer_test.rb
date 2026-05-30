@@ -1,7 +1,7 @@
 require("test_helper")
 
 class ReactEmailTestMailer < ApplicationMailer
-  use_react_assigns
+  use_react_instance_props
 
   def welcome
     mail(react: { name: "Ada" }, to: "ada@example.com", subject: "Welcome")
@@ -103,7 +103,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     assert_equal({ name: "Grace" }, request.props)
   end
 
-  test("mail react true uses assign props when enabled") do
+  test("mail react true uses instance props when enabled") do
     with_react_email_config(render_mode: FakeRenderer) { ReactEmailTestMailer.assigns.message }
 
     request = FakeRenderer.requests.sole
@@ -111,7 +111,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     assert_equal({ "name" => "Katherine" }, request.props)
   end
 
-  test("react true excludes mailer params from assign props") do
+  test("react true excludes mailer params from instance props") do
     with_react_email_config(render_mode: FakeRenderer) do
       ReactEmailTestMailer.with(token: "secret").assigns_with_params.message
     end
@@ -120,7 +120,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     assert_equal({ "name" => "Grace" }, request.props)
   end
 
-  test("react true without use_react_assigns infers the component and sends no props") do
+  test("react true without use_react_instance_props infers the component and sends no props") do
     with_react_email_config(render_mode: FakeRenderer) { ReactEmailNoAssignsMailer.assigns.message }
 
     request = FakeRenderer.requests.sole
