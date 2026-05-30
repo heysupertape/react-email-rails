@@ -30,11 +30,11 @@ Delivery, headers, multipart parts, previews, queues, and callbacks all stay nor
 
 The dev renderer loads the `reactEmailRails()` plugin, JSX support, and your `resolve`, `define`, and `css` config — but none of your other dev-server plugins.
 
-> `react-email-rails` was heavily influenced by [`inertia-rails`](https://inertia-rails.dev) and is designed as a companion to it. Mailers use the same component and props vocabulary as an Inertia Rails app, while staying inside Action Mailer's conventions.
+> react-email-rails was heavily influenced by [inertia-rails](https://inertia-rails.dev) and is designed as a companion to it. Mailers use the same component and props vocabulary as an Inertia app, while staying inside Action Mailer's conventions.
 
 ## Status
 
-**`react-email-rails` is pre-1.0.** It's tested in CI across the supported Ruby, Rails, Node, and Vite versions, but it hasn't been battle-tested in high-volume production environments yet, and the API may still change before 1.0. Give it a try, and please [share feedback and report issues](https://github.com/heysupertape/react-email-rails/issues) so we can keep hardening it toward a stable release.
+**react-email-rails is pre-1.0.** It's tested in CI across the supported Ruby, Rails, Node, and Vite versions, but it hasn't been battle-tested in high-volume production environments yet, and the API may still change before 1.0. Give it a try, and please [share feedback and report issues](https://github.com/heysupertape/react-email-rails/issues) so we can keep hardening it toward a stable release.
 
 ## Requirements
 
@@ -45,7 +45,7 @@ The dev renderer loads the `reactEmailRails()` plugin, JSX support, and your `re
 - React 18 or 19
 - `@react-email/render` 2.x
 
-> [`rails_vite`](https://github.com/skryukov/rails_vite/) is our recommended way to use Vite with Rails.
+> [rails_vite](https://github.com/skryukov/rails_vite/) is our recommended way to use Vite with Rails.
 
 ## Quick Start
 
@@ -105,7 +105,7 @@ export default function Created({ account }: CreatedProps) {
 }
 ```
 
-> [`@react-email/components`](https://react.email/docs/components/html) provides the full set of email-tested primitives — `<Button>`, `<Heading>`, `<Tailwind>`, and more.
+> [@react-email/components](https://react.email/docs/components/html) provides the full set of email-tested primitives — `<Button>`, `<Heading>`, `<Tailwind>`, and more.
 
 Render it from a mailer:
 
@@ -210,7 +210,7 @@ Action Mailer's framework assigns (including `params` and `rendered_format`) are
 
 ### Render Options
 
-`render_options` is passed to [`@react-email/render`](https://react.email/docs/utilities/render). `html` options apply to HTML rendering and `text` options apply to plain-text rendering. Keys are camelized before they cross into JavaScript.
+`render_options` is passed to [@react-email/render](https://react.email/docs/utilities/render). `html` options apply to HTML rendering and `text` options apply to plain-text rendering. Keys are camelized before they cross into JavaScript.
 
 ```ruby
 ReactEmailRails.configure do |config|
@@ -299,7 +299,7 @@ end
 
 #### Instrumentation
 
-Every render emits an [`ActiveSupport::Notifications`](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries the `component` name and, on success, the rendered HTML size in `html_bytes`:
+Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries the `component` name and, on success, the rendered HTML size in `html_bytes`:
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
@@ -410,7 +410,7 @@ Component names come from the Vite directory layout (see [Component Names](#comp
 
 The plugin registers a dedicated `email` [build environment](https://vite.dev/guide/api-environment), so your normal `vite build` emits the email bundle in the same pass as your client assets — no separate build step. It writes `tmp/react-email-rails/emails.js`, which the default production `render_command` runs with Node.
 
-The only requirement is that `vite build` runs on every process that renders mail, the same as for the rest of your assets. With [`rails_vite`](https://github.com/skryukov/rails_vite/) that already happens during `assets:precompile`, so there's nothing extra to wire up. The bundle is required, not an optimization: if it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent.
+The only requirement is that `vite build` runs on every process that renders mail, the same as for the rest of your assets. With [rails_vite](https://github.com/skryukov/rails_vite/) that already happens during `assets:precompile`, so there's nothing extra to wire up. The bundle is required, not an optimization: if it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent.
 
 To emit the bundle without a dedicated command, the plugin opts your project into Vite's [whole-app build](https://vite.dev/guide/api-environment): a plain `vite build` builds every configured environment in one pass. For a standard client-only app that's just your client assets plus the `email` bundle. If you've defined other Vite environments (say a custom `ssr` build), they build in the same pass too, so you can drop any separate build command you ran for them.
 
