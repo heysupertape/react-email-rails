@@ -390,7 +390,7 @@ By default, props are serialized with `as_json` and recursively camelized before
 
 - Ruby >= 3.3
 - Action Mailer, Active Support, and Railties >= 7.1 and < 9.0
-- Node >= 20.19
+- Node >= 20
 - Vite 7 or 8
 - React 18 or 19
 - `@react-email/render` 2.x
