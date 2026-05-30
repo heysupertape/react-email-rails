@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createServer, createServerModuleRunner, loadConfigFromFile } from "vite"
+import { createServer, isRunnableDevEnvironment, loadConfigFromFile } from "vite"
 
 if (process.argv.includes("--health")) {
   process.stdout.write(JSON.stringify({ ok: true }))
@@ -31,7 +31,7 @@ if (!emailPlugin) {
 
 // Forward config that affects how components resolve and compile (but not the
 // host's dev-server plugins, which have global side effects), so dev rendering
-// stays close to the `vite build --mode email` output.
+// stays close to the production email bundle.
 const server = await createServer({
   configFile: false,
   resolve: userConfig.resolve,
@@ -45,9 +45,17 @@ const server = await createServer({
   customLogger: logger,
 })
 
+// Render through the same `email` environment the production build uses, so dev
+// and build resolve and compile components identically.
+const environment = server.environments.email
+if (!isRunnableDevEnvironment(environment)) {
+  await server.close()
+  process.stderr.write("react-email-rails: the email environment is not runnable\n")
+  process.exit(1)
+}
+
 try {
-  const runner = createServerModuleRunner(server.environments.ssr)
-  const { run } = await runner.import("virtual:react-email-rails/server")
+  const { run } = await environment.runner.import("virtual:react-email-rails/server")
   await run()
 } finally {
   await server.close()

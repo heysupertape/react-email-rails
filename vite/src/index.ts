@@ -22,6 +22,11 @@ const VIRTUAL_MAIN = "virtual:react-email-rails/main"
 const RESOLVED_SERVER = `\0${VIRTUAL_SERVER}`
 const RESOLVED_MAIN = `\0${VIRTUAL_MAIN}`
 
+// The dedicated build environment that emits the server-side email bundle.
+export const EMAIL_ENVIRONMENT = "email"
+const OUT_DIR = "tmp/react-email-rails"
+const BUNDLE_FILE = "emails.js"
+
 export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
   const emails =
     typeof options.emails === "string" ? { path: options.emails } : (options.emails ?? {})
@@ -35,7 +40,9 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
   const extensions = rawExtensions
     .map((extension) => (extension.startsWith(".") ? extension : `.${extension}`))
     .map((extension, index) => ({ extension, index }))
-    .sort((left, right) => right.extension.length - left.extension.length || left.index - right.index)
+    .sort(
+      (left, right) => right.extension.length - left.extension.length || left.index - right.index,
+    )
     .map(({ extension }) => extension)
   const lazy = emails.lazy ?? true
   const standalone = options.standalone ?? false
@@ -81,18 +88,26 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       }
     },
 
-    config(_config, { mode }) {
-      if (mode !== "email") return
-
+    config() {
+      // Register a dedicated `email` build environment and opt the app into
+      // building all environments, so a plain `vite build` emits the email
+      // bundle alongside the client assets — no separate build step required.
+      // The environment is a server consumer, so its build externalizes Node
+      // dependencies by default; `standalone` inlines them instead.
       return {
-        ...(standalone ? { ssr: { noExternal: true } } : {}),
-        build: {
-          ssr: true,
-          outDir: "tmp/react-email-rails",
-          emptyOutDir: true,
-          rollupOptions: {
-            input: VIRTUAL_MAIN,
-            output: { entryFileNames: "emails.js" },
+        builder: {},
+        environments: {
+          [EMAIL_ENVIRONMENT]: {
+            ...(standalone ? { resolve: { noExternal: true } } : {}),
+            build: {
+              ssr: true,
+              outDir: OUT_DIR,
+              emptyOutDir: true,
+              rollupOptions: {
+                input: VIRTUAL_MAIN,
+                output: { entryFileNames: BUNDLE_FILE },
+              },
+            },
           },
         },
       }
