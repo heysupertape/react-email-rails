@@ -343,7 +343,7 @@ By default, props are serialized with `as_json` and recursively camelized before
 - React 18 or 19
 - `@react-email/render` 2.x
 
-CI tests Ruby 3.3, 3.4, and 4.0 against the latest supported Rails components and Rails 7.1. It also tests Node 20 and 24 against Vite 7 and 8.
+CI tests Ruby 3.3, 3.4, and 4.0 against Rails 7.2, Rails 8.0, and the latest supported Rails components. It also tests Node 20 and 24 against Vite 7 and 8.
 
 ## Development
 
