@@ -22,7 +22,7 @@ Building HTML emails is painfully archaic. [React Email](https://react.email) is
 
 ## How?
 
-**In development,** the gem renders components live through Vite's dev pipeline, so your emails get the same module resolution and transforms as the rest of your frontend. No build step is needed — each render picks up your latest edits.
+**In development,** the gem renders components live through Vite's dev pipeline, so your emails get the same module resolution and transforms as the rest of your frontend. No build step needed — each render picks up your latest edits.
 
 **In production,** Vite builds a server-side email bundle ahead of time (`vite build --mode email`). The gem runs that bundle with Node, sends props to the requested component, and receives rendered HTML and plain text back.
 
