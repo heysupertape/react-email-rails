@@ -1,0 +1,19 @@
+Description:
+    Install React Email Rails into a Rails + Vite application.
+
+Example:
+    bin/rails generate react_email_rails:install
+
+    This creates config/initializers/react_email_rails.rb, installs missing
+    JavaScript dependencies when a package manager can be detected, adds
+    reactEmailRails() to vite.config.*, and creates app/javascript/emails.
+
+Options:
+    --package-manager=npm|pnpm|yarn|bun
+        Choose the JavaScript package manager used to install dependencies.
+
+    --skip-package-install
+        Do not install JavaScript dependencies.
+
+    --skip-vite
+        Do not create or update vite.config.*.

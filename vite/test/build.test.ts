@@ -70,19 +70,19 @@ describe("vite build", () => {
 
     // The email environment built without a separate `--mode email` step...
     expect(existsSync(join(root, "tmp/react-email-rails/emails.js"))).toBe(true)
-    // ...with Node dependencies externalized by default...
-    expect(readFileSync(join(root, "tmp/react-email-rails/emails.js"), "utf8")).toContain(
-      "@react-email/render",
+    // ...with Node dependencies inlined by default...
+    expect(readFileSync(join(root, "tmp/react-email-rails/emails.js"), "utf8")).not.toMatch(
+      /from\s*"(react|@react-email\/render)"/,
     )
     // ...and the client environment still built in the same pass.
     expect(existsSync(join(root, "dist-client/index.html"))).toBe(true)
   }, 60_000)
 
-  it("inlines dependencies when standalone is set", async () => {
-    const root = await buildFixture({ standalone: true })
+  it("externalizes dependencies when standalone is false", async () => {
+    const root = await buildFixture({ standalone: false })
 
     const bundle = readFileSync(join(root, "tmp/react-email-rails/emails.js"), "utf8")
-    expect(bundle).not.toMatch(/from\s*"(react|@react-email\/render)"/)
+    expect(bundle).toContain("@react-email/render")
   }, 60_000)
 
   it("builds the email bundle alongside a user-defined environment in one pass", async () => {

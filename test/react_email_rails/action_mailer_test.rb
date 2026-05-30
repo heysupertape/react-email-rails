@@ -44,16 +44,15 @@ end
 
 class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
   class FakeRenderer
-    Request = Data.define(:component, :props, :cache, :render_options)
+    Request = Data.define(:component, :props, :render_options)
 
     class << self
       attr_accessor(:requests)
     end
 
-    def initialize(component:, props:, cache: nil, render_options: {})
+    def initialize(component:, props:, render_options: {})
       @component = component
       @props = props
-      @cache = cache
       @render_options = render_options
     end
 
@@ -62,7 +61,6 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
       self.class.requests << Request.new(
         component: @component,
         props: @props,
-        cache: @cache,
         render_options: @render_options,
       )
       ReactEmailRails::RenderedEmail.new(html: "<h1>Hello #{name}</h1>", text: "Hello #{name}")
@@ -70,7 +68,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
   end
 
   class FailingRenderer
-    def initialize(component:, props:, cache: nil, render_options: {}); end
+    def initialize(component:, props:, render_options: {}); end
 
     def render
       raise(ReactEmailRails::RenderError, "render process down")

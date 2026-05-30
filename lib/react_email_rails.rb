@@ -1,4 +1,3 @@
-require("digest")
 require("json")
 require("open3")
 require("timeout")
@@ -35,9 +34,9 @@ module ReactEmailRails
       yield(configuration)
     end
 
-    def render(component:, props:, cache: configuration.resolve_cache, render_options: configuration.resolve_render_options)
+    def render(component:, props:, render_options: configuration.resolve_render_options)
       ActiveSupport::Notifications.instrument("render.react-email-rails", component:) do |payload|
-        configuration.resolved_render_mode.new(component:, props:, cache:, render_options:).render.tap do |rendered|
+        configuration.resolved_render_mode.new(component:, props:, render_options:).render.tap do |rendered|
           payload[:html_bytes] = rendered.html.bytesize
         end
       end
@@ -48,7 +47,7 @@ module ReactEmailRails
 
     def healthy?
       configuration.resolved_render_mode.healthy?(
-        command: configuration.resolved_render_command,
+        command: configuration.send(:resolved_render_command),
         timeout: configuration.render_timeout,
       )
     rescue StandardError

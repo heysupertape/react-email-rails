@@ -33,7 +33,7 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     events = []
     subscriber = ActiveSupport::Notifications.subscribe("render.react-email-rails") { |event| events << event }
 
-    with_react_email_config(render_command: RENDER_FIXED, cache: false) do
+    with_react_email_internals(render_command: RENDER_FIXED) do
       ReactEmailRails.render(component: "users/welcome", props: {})
     end
 
@@ -47,13 +47,13 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
   test("render invokes on_render_error and re-raises on failure") do
     reported = []
 
-    with_react_email_config(
-      render_command: [RUBY, "-e", "exit 1"],
-      cache: false,
-      on_render_error: ->(error, component:) { reported << [error, component] },
-    ) do
-      assert_raises(ReactEmailRails::RenderError) do
-        ReactEmailRails.render(component: "users/welcome", props: {})
+    with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
+      with_react_email_config(
+        on_render_error: ->(error, component:) { reported << [error, component] },
+      ) do
+        assert_raises(ReactEmailRails::RenderError) do
+          ReactEmailRails.render(component: "users/welcome", props: {})
+        end
       end
     end
 
@@ -63,28 +63,32 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
   end
 
   test("healthy? returns true when the command reports ok") do
-    with_react_email_config(render_command: HEALTH_OK) do
+    with_react_email_internals(render_command: HEALTH_OK) do
       assert(ReactEmailRails.healthy?)
     end
   end
 
   test("healthy? uses the persistent render mode protocol when configured") do
-    with_react_email_config(render_command: PERSISTENT_HEALTH_OK, render_mode: :persistent) do
-      assert(ReactEmailRails.healthy?)
+    with_react_email_internals(render_command: PERSISTENT_HEALTH_OK) do
+      with_react_email_config(render_mode: :persistent) do
+        assert(ReactEmailRails.healthy?)
+      end
     end
   ensure
     ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
   end
 
   test("healthy? returns false when the command fails") do
-    with_react_email_config(render_command: [RUBY, "-e", "exit 1"]) do
+    with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
       assert_not(ReactEmailRails.healthy?)
     end
   end
 
   test("healthy? returns false when the command times out") do
-    with_react_email_config(render_command: [RUBY, "-e", "sleep 5"], render_timeout: 0.1) do
-      assert_not(ReactEmailRails.healthy?)
+    with_react_email_internals(render_command: [RUBY, "-e", "sleep 5"]) do
+      with_react_email_config(render_timeout: 0.1) do
+        assert_not(ReactEmailRails.healthy?)
+      end
     end
   end
 end

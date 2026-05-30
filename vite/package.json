@@ -27,6 +27,7 @@
   },
   "types": "./dist/index.d.ts",
   "bin": {
+    "react-email-rails-config": "./bin/config.mjs",
     "react-email-rails-dev": "./bin/dev.mjs"
   },
   "scripts": {

@@ -8,24 +8,19 @@ class ReactEmailRails::RenderModes::Subprocess
     end
   end
 
-  def initialize(component:, props:, cache: nil, render_options: {})
+  def initialize(component:, props:, render_options: {})
     @component = component
     @props = props
-    @cache = cache
     @render_options = render_options
   end
 
   def render
-    if (cache_options = cache_options_hash)
-      cache_store.fetch(cache_key, **cache_options) { run }
-    else
-      run
-    end
+    run
   end
 
   private
 
-  attr_reader(:component, :props, :cache, :render_options)
+  attr_reader(:component, :props, :render_options)
 
   def run
     result = capture(payload_json)
@@ -46,7 +41,7 @@ class ReactEmailRails::RenderModes::Subprocess
   end
 
   def command
-    @command ||= ReactEmailRails.configuration.resolved_render_command
+    @command ||= ReactEmailRails.configuration.send(:resolved_render_command)
   end
 
   def render_timeout
@@ -57,7 +52,7 @@ class ReactEmailRails::RenderModes::Subprocess
     @payload ||= begin
       payload = {
         component:,
-        props: ReactEmailRails.configuration.transform_props(props),
+        props: ReactEmailRails.configuration.send(:serialize_props, props),
       }
       payload[:renderOptions] = render_options if render_options.present?
       payload
@@ -74,21 +69,5 @@ class ReactEmailRails::RenderModes::Subprocess
 
   def render_error(message)
     ReactEmailRails::RenderError.new("React Email render failed for #{component}: #{message}")
-  end
-
-  def cache_options_hash
-    case cache
-    when true then {}
-    when Hash then cache
-    end
-  end
-
-  def cache_key
-    version = ReactEmailRails.configuration.resolved_cache_version
-    ["react-email-rails", version, Digest::SHA256.hexdigest(payload_json)].compact.join("/")
-  end
-
-  def cache_store
-    ReactEmailRails.configuration.resolved_cache_store
   end
 end

@@ -21,7 +21,7 @@ class ReactEmailRails::RenderModes::Persistent < ReactEmailRails::RenderModes::S
   end
 
   def render_process_max_requests
-    ReactEmailRails.configuration.render_process_max_requests
+    ReactEmailRails.configuration.send(:render_process_max_requests)
   end
 end
 
