@@ -6,8 +6,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["Supertape"]
   spec.email = ["hi@supertape.com"]
 
-  spec.summary = "React Email integration for Rails"
-  spec.description = "Send emails using React Email components from Rails with Action Mailer."
+  spec.summary = "Build and send emails using React and Rails"
+  spec.description = "Seamless integration between Action Mailer and React Email components."
   spec.homepage = "https://github.com/heysupertape/react-email-rails"
   spec.license = "MIT"
 
@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true",
   }
 
-  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*", "README.md", "CHANGELOG.md", "LICENSE.md"] }
+  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE.md", "SECURITY.md"] }
   spec.require_paths = ["lib"]
   spec.required_ruby_version = ">= 3.3"
 

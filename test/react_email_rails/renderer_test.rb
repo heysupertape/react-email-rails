@@ -44,6 +44,30 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     "--",
   ].freeze
 
+  RENDER_PERSISTENT_PARTIAL_RESPONSE = [
+    RUBY,
+    "-e",
+    <<~RUBY,
+      $stdin.gets
+      $stdout.write("{")
+      $stdout.flush
+      sleep 5
+    RUBY
+    "--",
+  ].freeze
+
+  RENDER_PERSISTENT_LARGE_RESPONSE = [
+    RUBY,
+    "-e",
+    <<~RUBY,
+      require "json"
+      $stdin.gets
+      $stdout.puts(JSON.generate(ok: true, html: "x" * (1024 * 1024), text: ""))
+      $stdout.flush
+    RUBY
+    "--",
+  ].freeze
+
   RENDER_PERSISTENT_PID = [
     RUBY,
     "-e",
@@ -223,6 +247,32 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     end
 
     assert_includes(error.message, "component exploded")
+  end
+
+  test("persistent render mode times out when a response line is incomplete") do
+    error = assert_raises(ReactEmailRails::RenderError) do
+      with_react_email_config(
+        render_command: RENDER_PERSISTENT_PARTIAL_RESPONSE,
+        render_mode: :persistent,
+        render_timeout: 0.2,
+      ) do
+        ReactEmailRails.render(component: "users/welcome", props: {})
+      end
+    end
+
+    assert_includes(error.message, "timed out")
+  end
+
+  test("persistent render mode reads large response lines without timing out") do
+    rendered = with_react_email_config(
+      render_command: RENDER_PERSISTENT_LARGE_RESPONSE,
+      render_mode: :persistent,
+      render_timeout: 1,
+    ) do
+      ReactEmailRails.render(component: "users/welcome", props: {})
+    end
+
+    assert_equal(1024 * 1024, rendered.html.bytesize)
   end
 
   test("persistent render processes are not shared across forks") do

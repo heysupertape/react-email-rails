@@ -1,7 +1,7 @@
 {
   "name": "react-email-rails",
   "version": "0.1.0",
-  "description": "React Email integration for Rails",
+  "description": "Build and send emails using React and Rails",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.1",

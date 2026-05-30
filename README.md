@@ -101,7 +101,7 @@ vite build --mode email
 ```ruby
 mail react: { user: }, to:, subject:               # infer component, explicit props
 mail react: "users/welcome", props: { user: }, ... # explicit component + props
-mail react: true, to:, subject:                     # infer component + instance assigns
+mail react: true, to:, subject:                     # infer component + instance props
 ```
 
 ### Component Names
@@ -154,11 +154,11 @@ mail react: "accounts/welcome", props: {
 }, to:, subject:
 ```
 
-Use `react: true` to send mailer assigns as props:
+Use `react: true` to send mailer instance variables as props:
 
 ```ruby
 class AccountMailer < ApplicationMailer
-  use_react_assigns
+  use_react_instance_props
 
   def created
     @account = params.fetch(:account)
@@ -167,7 +167,7 @@ class AccountMailer < ApplicationMailer
 end
 ```
 
-Framework internals and `params` are excluded from assign props. Without `use_react_assigns`, `react: true` still infers the component and renders it with no props, which is handy for emails that take no props at all.
+Framework internals and `params` are excluded from instance props. Without `use_react_instance_props`, `react: true` still infers the component and renders it with no props, which is handy for emails that take no props at all.
 
 ### Render Options
 
@@ -247,7 +247,7 @@ The defaults fit the standard companion-package setup, so most apps configure no
 
 | Option | Default |
 |--------|---------|
-| `render_command` | dev: `node_modules/.bin/react-email-rails-dev`; else `node tmp/react-email-rails/emails.js` |
+| `render_command` | dev: `["node_modules/.bin/react-email-rails-dev"]`; else `["node", "tmp/react-email-rails/emails.js"]` |
 | `render_timeout` | `10` seconds |
 | `cache` | `ActionMailer::Base.perform_caching` |
 | `cache_version` | digest of `tmp/react-email-rails/emails.js` |
@@ -261,7 +261,59 @@ The defaults fit the standard companion-package setup, so most apps configure no
 | `on_render_error` | `nil` |
 | `verify_render_on_boot` | `-> { Rails.env.production? }` |
 
-Custom `render_command` values must follow the same JSON stdin/stdout contract as the bundled render runtime.
+Custom `render_command` values should be argv arrays, for example `["node", Rails.root.join("tmp/react-email-rails/emails.js").to_s]`, and must follow the same JSON stdin/stdout contract as the bundled render runtime.
+
+### Custom Render Commands
+
+Most apps should use the bundled renderer. If you provide a custom `render_command`, the command must read JSON from stdin and write JSON to stdout. Stderr is treated as diagnostic output and may be included in raised `ReactEmailRails::RenderError` messages.
+
+In `:subprocess` mode, each render starts a fresh process. The request body is:
+
+```json
+{
+  "component": "account_mailer/created",
+  "props": { "accountName": "Ada" },
+  "renderOptions": {
+    "html": { "pretty": true },
+    "text": {}
+  }
+}
+```
+
+Successful responses must include HTML and may include text:
+
+```json
+{
+  "html": "<p>Hello Ada</p>",
+  "text": "Hello Ada"
+}
+```
+
+For health checks, the command is called with `--health` and should write:
+
+```json
+{ "ok": true }
+```
+
+In `:persistent` mode, the command is called with `--persistent`. It receives newline-delimited JSON requests and must write one newline-terminated JSON response per request. Render responses should include `ok: true`:
+
+```json
+{ "ok": true, "html": "<p>Hello Ada</p>", "text": "Hello Ada" }
+```
+
+Persistent health checks are sent over the same stdin/stdout protocol:
+
+```json
+{ "health": true }
+```
+
+and should return:
+
+```json
+{ "ok": true }
+```
+
+Persistent failures should return `ok: false` with an error string. The response line must be complete before `render_timeout`; partial lines are treated as timeouts.
 
 ### Caching
 
@@ -338,12 +390,12 @@ By default, props are serialized with `as_json` and recursively camelized before
 
 - Ruby >= 3.3
 - Action Mailer, Active Support, and Railties >= 7.1 and < 9.0
-- Node >= 20.19
+- Node >= 20
 - Vite 7 or 8
 - React 18 or 19
 - `@react-email/render` 2.x
 
-CI tests Ruby 3.3, 3.4, and 4.0 against Rails 7.2, Rails 8.0, and the latest supported Rails components. It also tests Node 20 and 24 against Vite 7 and 8.
+CI tests Ruby 3.3, 3.4, and 4.0 against Rails 7.2, Rails 8.0, and the latest supported Rails components. It also tests Node 20.19, 22, and 24 against Vite 7 and 8.
 
 ## Development
 

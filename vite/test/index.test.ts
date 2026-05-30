@@ -277,6 +277,17 @@ describe("reactEmailRails plugin", () => {
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')
     expect(source).toContain('const extensions = [".tsx",".jsx"]')
   })
+
+  it("matches longer overlapping extensions before shorter suffixes", () => {
+    const plugin = reactEmailRails({ emails: { extension: ["tsx", ".email.tsx"] } })
+    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
+      "virtual:react-email-rails/server",
+    )
+    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+
+    expect(source).toContain('"/app/javascript/emails/**/*{.email.tsx,.tsx}"')
+    expect(source).toContain('const extensions = [".email.tsx",".tsx"]')
+  })
 })
 
 function streamFromChunks(chunks: string[]): AsyncIterable<string> & { setEncoding: () => void } {
