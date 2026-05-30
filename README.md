@@ -1,4 +1,4 @@
-# Rails + React Email
+# React Email + Rails
 
 Build and send emails using React and Rails — a seamless integration between [React Email](https://react.email) and [Action Mailer](https://guides.rubyonrails.org/action_mailer_basics.html).
 
@@ -30,8 +30,6 @@ Delivery, headers, multipart parts, previews, queues, and callbacks all stay nor
 
 The dev renderer loads the `reactEmailRails()` plugin, JSX support, and your `resolve`, `define`, and `css` config — but none of your other dev-server plugins.
 
-> react-email-rails was heavily influenced by [inertia-rails](https://inertia-rails.dev) and is designed as a companion to it. Mailers use the same component and props vocabulary as an Inertia app, while staying inside Action Mailer's conventions.
-
 ## Status
 
 **react-email-rails is pre-1.0.** It's tested in CI across the supported Ruby, Rails, Node, and Vite versions, but it hasn't been battle-tested in high-volume production environments yet, and the API may still change before 1.0. Give it a try, and please [share feedback and report issues](https://github.com/heysupertape/react-email-rails/issues) so we can keep hardening it toward a stable release.
@@ -56,19 +54,25 @@ Add the gem:
 gem "react-email-rails"
 ```
 
-Optionally, generate an initializer to customize behavior later:
+### Automatic Install
+
+Run the installer:
 
 ```sh
 bin/rails generate react_email_rails:install
 ```
 
-Install the npm package and its peer dependencies:
+The installer creates `config/initializers/react_email_rails.rb`, installs missing JavaScript dependencies when it can detect your package manager, adds `reactEmailRails()` to `vite.config.*`, and creates `app/javascript/emails`.
+
+### Manual Install
+
+Install the npm package and peer dependencies manually:
 
 ```sh
 npm i react-email-rails @react-email/render @react-email/components react react-dom
 ```
 
-Add the Vite plugin:
+Update your Vite config to add the plugin:
 
 ```ts
 // vite.config.ts
@@ -80,7 +84,23 @@ export default defineConfig({
 })
 ```
 
-Create an email component:
+### Your First Email
+
+Generate a mailer and React Email component:
+
+```sh
+bin/rails generate react_email_rails:email Account created
+```
+
+The generator follows Rails' mailer generator shape: `NAME [method method]`. It creates `app/mailers/account_mailer.rb`, matching components under your configured React Email directory, plus a mailer preview and test.
+
+If `reactEmailRails()` is configured with a custom `emails.path` or `emails.extension`, the generator uses those settings. You can also override them directly:
+
+```sh
+bin/rails generate react_email_rails:email Account created --emails-path=app/emails --extension=jsx
+```
+
+Edit the generated email component:
 
 ```tsx
 // app/javascript/emails/account_mailer/created.tsx
@@ -139,6 +159,8 @@ Inside a mailer, `react:` accepts three forms:
 | `String` | `react: "accounts/welcome", props: { account: }` | the string | `props:` (optional) |
 | `true` | `react: true` | inferred from mailer + action | instance variables with `use_react_instance_props`, otherwise none |
 
+> These intentionally mirror [inertia-rails](https://inertia-rails.dev), making using the two together feel consistent.
+
 Each top-level key you pass becomes a prop on the component's default export — `react: { account: }` renders `Created` with an `account` prop.
 
 ### Component Names
@@ -151,6 +173,8 @@ By default, component names are inferred from the mailer and action:
 | `Users::InviteMailer#new_invite` | `users/invite_mailer/new_invite` |
 
 Rails derives `account_mailer` from `AccountMailer` via its `mailer_name`. The default Vite plugin resolves those names under `app/javascript/emails`, so `account_mailer/created` maps to `app/javascript/emails/account_mailer/created.tsx` or `.jsx`.
+
+Files and directories starting with `_` are ignored as renderable email entries by default. Use them for shared components such as `_components/email_layout.tsx`; they can still be imported by email components.
 
 Override the inferred name per mail:
 
@@ -208,6 +232,46 @@ end
 
 Action Mailer's framework assigns (including `params` and `rendered_format`) are excluded from instance props. Without `use_react_instance_props`, `react: true` still infers the component and renders it with no props, which is handy for emails that take no props at all.
 
+### Layouts
+
+Action Mailer layouts are not applied to `react:` emails. React Email treats layouts like any other component, so share structure with normal React composition instead:
+
+```tsx
+// app/javascript/emails/_components/email_layout.tsx
+import { Body, Container, Html } from "@react-email/components"
+import type { ReactNode } from "react"
+
+type EmailLayoutProps = {
+  children: ReactNode
+}
+
+export function EmailLayout({ children }: EmailLayoutProps) {
+  return (
+    <Html>
+      <Body>
+        <Container>{children}</Container>
+      </Body>
+    </Html>
+  )
+}
+```
+
+```tsx
+// app/javascript/emails/account_mailer/created.tsx
+import { Text } from "@react-email/components"
+import { EmailLayout } from "../_components/email_layout"
+
+export default function Created() {
+  return (
+    <EmailLayout>
+      <Text>Welcome</Text>
+    </EmailLayout>
+  )
+}
+```
+
+The default Vite plugin ignores underscore-prefixed files and directories, so shared components like `_components/email_layout.tsx` are available to import but are not treated as renderable email entries.
+
 ### Render Options
 
 `render_options` is passed to [@react-email/render](https://react.email/docs/utilities/render). `html` options apply to HTML rendering and `text` options apply to plain-text rendering. Keys are camelized before they cross into JavaScript.
@@ -233,31 +297,51 @@ Configuration is handled primarily on the Rails side, though there are some Vite
 
 ### Rails Configuration
 
-The defaults fit a standard install, so most apps configure nothing. Every option is overridable via `ReactEmailRails.configure` in your initializer.
+The defaults fit a standard install, so most apps configure nothing. The generated initializer is intentionally just a placeholder for the few apps that need overrides. The options below are the supported public configuration surface.
+
+Commonly useful options:
 
 | Option | Default |
 |--------|---------|
-| `cache` | `ActionMailer::Base.perform_caching` |
-| `cache_version` | digest of `tmp/react-email-rails/emails.js` |
-| `cache_store` | `Rails.cache` |
 | `component_path_resolver` | `->(mailer:, action:) { "#{mailer}/#{action}" }` |
-| `prop_serializer` | `->(props:) { props.as_json }` |
-| `prop_transformer` | recursive camelCase |
 | `render_mode` | `:subprocess` |
 | `render_options` | `{}` |
-| `render_command` | dev: `["node_modules/.bin/react-email-rails-dev"]`; else `["node", "tmp/react-email-rails/emails.js"]` |
 | `render_timeout` | `10` seconds |
-| `render_process_max_requests` | `1_000` |
+| `transform_props` | `:lower_camel` |
 | `on_render_error` | `nil` |
-| `verify_render_on_boot` | `-> { Rails.env.production? }` |
+| `verify_render_on_boot` | `false` |
 
-Paths in the default `render_command` are resolved against `Rails.root`. A custom `render_command` must be an argv array and must follow the JSON contract described in [Custom Render Commands](#custom-render-commands).
+#### Prop Serialization
 
-#### Caching
+Props are serialized with `as_json`, then their keys are recursively transformed before they cross into JavaScript. The default `:lower_camel` transform makes Rails-style Ruby props feel natural in React components:
 
-`cache` can be `false`, `true`, a Hash, or a callable. Callable cache settings are evaluated in the mailer instance, so caching can vary by action. By default we use `ActionMailer::Base.perform_caching`.
+```ruby
+mail(react: { account_name: "Ada" })
+```
 
-`cache_version` defaults to a digest of the built email bundle. Because the version tracks the bundle's digest, every deploy that changes a component invalidates the cached HTML.
+```tsx
+export default function Created({ accountName }: { accountName: string }) {
+  // ...
+}
+```
+
+Set `transform_props` to another supported value if you prefer a different prop key style:
+
+| Value | Example |
+|-------|---------|
+| `:camel` | `AccountName` |
+| `:lower_camel` | `accountName` |
+| `:dash` | `account-name` |
+| `:snake` | `account_name` |
+| `:none` | preserves serialized keys |
+
+```ruby
+ReactEmailRails.configure do |config|
+  config.transform_props = :none
+end
+```
+
+`transform_props` only controls prop key names; props are always serialized with `as_json`.
 
 #### Render Modes
 
@@ -275,7 +359,6 @@ Enable persistent mode for render-heavy worker processes:
 ```ruby
 ReactEmailRails.configure do |config|
   config.render_mode = :persistent
-  config.render_process_max_requests = 1_000
 end
 ```
 
@@ -283,7 +366,7 @@ Persistent mode keeps one Node child per process:
 
 - Renders are sent as newline-delimited JSON and processed one at a time, so a single child never renders concurrently. Scale throughput by adding worker processes.
 - It is fork-safe: under clustered Puma or forking job runners, each worker spawns its own child.
-- The child is recycled after `render_process_max_requests` renders to bound memory growth. Set it to `nil` to disable recycling.
+- The child is recycled periodically to bound memory growth.
 
 #### Error Reporting
 
@@ -310,61 +393,11 @@ ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
 end
 ```
 
-#### Custom Render Commands
-
-Most apps should use the bundled renderer. If you provide a custom `render_command`, the command must read JSON from stdin and write JSON to stdout. Stderr is treated as diagnostic output and may be included in raised `ReactEmailRails::RenderError` messages.
-
-In `:subprocess` mode, each render starts a fresh process. The request body is:
-
-```json
-{
-  "component": "account_mailer/created",
-  "props": { "accountName": "Ada" },
-  "renderOptions": {
-    "html": { "pretty": true },
-    "text": {}
-  }
-}
-```
-
-Successful responses must include HTML and may include text:
-
-```json
-{
-  "html": "<p>Hello Ada</p>",
-  "text": "Hello Ada"
-}
-```
-
-For health checks, the command is called with `--health` and should write:
-
-```json
-{ "ok": true }
-```
-
-In `:persistent` mode, the command is called with `--persistent`. It receives the same request bodies as newline-delimited JSON and must write one newline-terminated JSON response per request. Render responses should include `ok: true`:
-
-```json
-{ "ok": true, "html": "<p>Hello Ada</p>", "text": "Hello Ada" }
-```
-
-Persistent health checks are sent over the same stdin/stdout protocol:
-
-```json
-{ "health": true }
-```
-
-and should return:
-
-```json
-{ "ok": true }
-```
-
-Persistent failures should return `ok: false` with an error string. Each response must arrive as a complete, newline-terminated line within `render_timeout`; if the deadline passes first, the render times out and any partial output is discarded.
-
 ### Vite Configuration
 
-The `reactEmailRails()` plugin (added in [Quick Start](#quick-start)) discovers `.tsx` and `.jsx` files in `app/javascript/emails` and adds a dedicated `email` build environment that emits the SSR bundle during a normal `vite build` (see [Deployment](#deployment)). The defaults suit most apps; the options below customize them.
+The `reactEmailRails()` plugin (added in [Quick Start](#quick-start)) discovers `.tsx` and `.jsx` files in `app/javascript/emails` and adds a dedicated `email` build environment that emits the SSR bundle during a normal `vite build` (see [Deployment](#deployment)). Most apps use it without options.
+
+The `emails` options mirror the shape used by inertia-rails, which keeps Rails + Vite projects consistent when the same app uses both.
 
 #### Plugin Options
 
@@ -372,9 +405,8 @@ The `reactEmailRails()` plugin (added in [Quick Start](#quick-start)) discovers 
 |--------|---------|-------------|
 | `emails.path` | `"app/javascript/emails"` | Directory containing email components |
 | `emails.extension` | `[".tsx", ".jsx"]` | Component extension, or an array of extensions |
-| `emails.lazy` | `true` | Use lazy `import.meta.glob` entries |
 | `emails.ignore` | `["**/_*", "**/_*/**"]` | Glob patterns ignored under `emails.path` |
-| `standalone` | `false` | Inline SSR dependencies with `ssr.noExternal: true` |
+| `standalone` | `true` | Inline SSR dependencies with `ssr.noExternal: true` |
 
 Use a custom directory:
 
@@ -394,21 +426,25 @@ reactEmailRails({
 })
 ```
 
-Prefer eager imports in production persistent renderers so component import failures surface during boot health checks instead of at render time:
+Component names come from the Vite directory layout (see [Component Names](#component-names)). To map mailer actions to a different layout, override `component_path_resolver` on the Ruby side rather than renaming in the plugin, so both halves stay in sync.
+
+#### Standalone Builds
+
+By default the email bundle inlines React, `@react-email/render`, and other Node dependencies. That makes the bundle larger, but it works well for Rails deploys that build assets in one stage and run without `node_modules` in the final runtime image.
+
+Set `standalone: false` when your runtime already ships `node_modules` and you prefer a smaller SSR-style bundle:
 
 ```ts
 reactEmailRails({
-  emails: {
-    lazy: false,
-  },
+  standalone: false,
 })
 ```
 
-Component names come from the Vite directory layout (see [Component Names](#component-names)). To map mailer actions to a different layout, override `component_path_resolver` on the Ruby side rather than renaming in the plugin, so both halves stay in sync.
+Externalized bundles are smaller and may build faster, but the renderer needs the externalized packages available at runtime.
 
 ## Deployment
 
-The plugin registers a dedicated `email` [build environment](https://vite.dev/guide/api-environment), so your normal `vite build` emits the email bundle in the same pass as your client assets — no separate build step. It writes `tmp/react-email-rails/emails.js`, which the default production `render_command` runs with Node.
+The plugin registers a dedicated `email` [build environment](https://vite.dev/guide/api-environment), so your normal `vite build` emits the email bundle in the same pass as your client assets — no separate build step. It writes `tmp/react-email-rails/emails.js`, which the bundled production renderer runs with Node.
 
 The only requirement is that `vite build` runs on every process that renders mail, the same as for the rest of your assets. With [rails_vite](https://github.com/skryukov/rails_vite/) that already happens during `assets:precompile`, so there's nothing extra to wire up. The bundle is required, not an optimization: if it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent.
 
@@ -416,9 +452,9 @@ To emit the bundle without a dedicated command, the plugin opts your project int
 
 If your Vite config defines a custom `builder.buildApp`, make sure it builds `builder.environments.email` alongside your other environments. Custom builders replace Vite's default whole-app build orchestration, so the email bundle is emitted only if your builder includes that environment.
 
-By default the bundle externalizes `react`, `react-dom`, `@react-email/render`, and the runtime, so the renderer needs `node_modules` present alongside `tmp/react-email-rails/emails.js` at runtime. To deploy the bundle without `node_modules`, set `standalone: true` on the plugin to inline those dependencies into a self-contained bundle.
+By default the bundle inlines `react`, `react-dom`, `@react-email/render`, and the runtime, so it can run without `node_modules` in the Rails runtime image. If your runtime already includes Node dependencies, use an [externalized build](#standalone-builds).
 
-Scope boot verification to the same processes that build the bundle:
+Boot verification is disabled by default. If you want the app to check the renderer during boot, scope it to the same processes that build or ship the bundle:
 
 ```ruby
 ReactEmailRails.configure do |config|

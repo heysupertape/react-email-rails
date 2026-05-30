@@ -5,13 +5,23 @@ export type EmailsOption =
   | {
       path?: string
       extension?: string | string[]
-      lazy?: boolean
       ignore?: string | string[]
     }
 
 export type ReactEmailRailsOptions = {
   emails?: EmailsOption
   standalone?: boolean
+}
+
+type PluginMetadata = {
+  emails: {
+    path: string
+    extensions: string[]
+    ignore: string[]
+  }
+  standalone: boolean
+  outDir: string
+  bundleFile: string
 }
 
 const DEFAULT_IGNORE = ["**/_*", "**/_*/**"]
@@ -24,6 +34,7 @@ const RESOLVED_MAIN = `\0${VIRTUAL_MAIN}`
 
 // The dedicated build environment that emits the server-side email bundle.
 export const EMAIL_ENVIRONMENT = "email"
+const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 
@@ -44,8 +55,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       (left, right) => right.extension.length - left.extension.length || left.index - right.index,
     )
     .map(({ extension }) => extension)
-  const lazy = emails.lazy ?? true
-  const standalone = options.standalone ?? false
+  const standalone = options.standalone ?? true
 
   const root = `/${path}/`
   const pattern =
@@ -58,9 +68,8 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
         : [emails.ignore]
   const globPatterns = [pattern, ...ignore.map((glob) => `!${root}${glob}`)]
   const globArg = JSON.stringify(globPatterns.length === 1 ? globPatterns[0] : globPatterns)
-  const globOptions = lazy ? "" : ", { eager: true }"
 
-  return {
+  const plugin: Plugin = {
     name: "react-email-rails",
 
     resolveId(id) {
@@ -72,7 +81,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       if (id === RESOLVED_SERVER) {
         return [
           `import { serve, toComponentName } from "react-email-rails/runtime"`,
-          `const modules = import.meta.glob(${globArg}${globOptions})`,
+          `const modules = import.meta.glob(${globArg})`,
           `const extensions = ${JSON.stringify(extensions)}`,
           `const registry = Object.create(null)`,
           `for (const path in modules) {`,
@@ -92,8 +101,8 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       // Register a dedicated `email` build environment and opt the app into
       // building all environments, so a plain `vite build` emits the email
       // bundle alongside the client assets — no separate build step required.
-      // The environment is a server consumer, so its build externalizes Node
-      // dependencies by default; `standalone` inlines them instead.
+      // The environment is a server consumer. Standalone builds inline Node
+      // dependencies by default so Rails runtime images do not need node_modules.
       return {
         builder: {},
         environments: {
@@ -113,6 +122,25 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       }
     },
   }
+
+  const metadata: PluginMetadata = {
+    emails: {
+      path,
+      extensions,
+      ignore,
+    },
+    standalone,
+    outDir: OUT_DIR,
+    bundleFile: BUNDLE_FILE,
+  }
+
+  Object.defineProperty(plugin, CONFIG_SYMBOL, {
+    value: {
+      ...metadata,
+    },
+  })
+
+  return plugin
 }
 
 export type {

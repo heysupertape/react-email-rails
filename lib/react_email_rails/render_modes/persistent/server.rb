@@ -46,7 +46,7 @@ class ReactEmailRails::RenderModes::Persistent::Server
       @wait_thread.join(1)
       terminate_process("KILL", @wait_thread.pid) if @wait_thread.alive?
     end
-  rescue Errno::ESRCH
+  rescue Errno::ESRCH, Errno::EPERM
     nil
   ensure
     [@stdin, @stdout, @stderr].compact.each { |io| io.close unless io.closed? }
@@ -152,7 +152,7 @@ class ReactEmailRails::RenderModes::Persistent::Server
 
   def terminate_process(signal, pid)
     Process.kill(signal, -pid)
-  rescue Errno::ESRCH
+  rescue Errno::ESRCH, Errno::EPERM
     nil
   end
 

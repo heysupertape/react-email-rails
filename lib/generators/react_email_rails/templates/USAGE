@@ -1,0 +1,33 @@
+Description:
+    Generate an Action Mailer class backed by React Email components.
+
+Example:
+    bin/rails generate react_email_rails:email Account created invited
+
+    This creates:
+        app/mailers/account_mailer.rb
+        app/javascript/emails/account_mailer/created.tsx
+        app/javascript/emails/account_mailer/invited.tsx
+        test/mailers/account_mailer_test.rb
+        test/mailers/previews/account_mailer_preview.rb
+
+    The generator follows Rails' mailer generator shape:
+
+        NAME [method method]
+
+Options:
+    --emails-path=app/emails
+        Override the React Email component directory. By default this is
+        detected from reactEmailRails({ emails: ... }) in vite.config.* and
+        falls back to app/javascript/emails.
+
+    --extension=tsx|jsx|email.tsx
+        Override the generated component extension. By default this is detected
+        from the Vite plugin config, existing components, TypeScript signals,
+        and finally falls back to tsx.
+
+    --skip-test
+        Do not create a mailer test.
+
+    --skip-preview
+        Do not create a mailer preview.

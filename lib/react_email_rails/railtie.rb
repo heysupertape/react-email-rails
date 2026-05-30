@@ -9,7 +9,7 @@ class ReactEmailRails::Railtie < Rails::Railtie
     if ReactEmailRails.configuration.verify_render_on_boot? && !ReactEmailRails.healthy?
       Rails.logger.error(
         "[react-email-rails] render verification failed for command: " \
-          "#{ReactEmailRails.configuration.resolved_render_command.inspect}",
+          "#{ReactEmailRails.configuration.send(:resolved_render_command).inspect}",
       )
     end
   end

@@ -187,6 +187,24 @@ describe("reactEmailRails plugin", () => {
     expect(source).toContain("export const run")
   })
 
+  it("keeps normalized plugin metadata for Rails generators behind an internal symbol", () => {
+    const plugin = reactEmailRails({
+      emails: { path: "/app/frontend/emails/", extension: "jsx" },
+      standalone: true,
+    })
+    const metadata = (plugin as unknown as Record<symbol, unknown>)[
+      Symbol.for("react-email-rails.config")
+    ]
+
+    expect(metadata).toMatchObject({
+      emails: {
+        path: "app/frontend/emails",
+        extensions: [".jsx"],
+      },
+      standalone: true,
+    })
+  })
+
   it("ignores underscore-prefixed partials by default", () => {
     const plugin = reactEmailRails()
     const resolved = (plugin.resolveId as (id: string) => string | undefined)(
@@ -236,18 +254,18 @@ describe("reactEmailRails plugin", () => {
     })
   })
 
-  it("externalizes dependencies for the email build by default", () => {
+  it("inlines dependencies for the email build by default", () => {
     const plugin = reactEmailRails()
     const config = (plugin.config as () => EmailConfig)()
 
-    expect(config.environments.email.resolve).toBeUndefined()
+    expect(config.environments.email.resolve).toMatchObject({ noExternal: true })
   })
 
-  it("inlines dependencies for the email build when standalone is set", () => {
-    const plugin = reactEmailRails({ standalone: true })
+  it("externalizes dependencies for the email build when standalone is false", () => {
+    const plugin = reactEmailRails({ standalone: false })
     const config = (plugin.config as () => EmailConfig)()
 
-    expect(config.environments.email.resolve).toMatchObject({ noExternal: true })
+    expect(config.environments.email.resolve).toBeUndefined()
   })
 
   it("accepts an emails string shorthand for the directory", () => {
