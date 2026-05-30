@@ -4,7 +4,7 @@
   "description": "React Email integration for Rails",
   "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@11.5.0",
+  "packageManager": "pnpm@10.34.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/heysupertape/react-email-rails.git",
