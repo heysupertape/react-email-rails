@@ -32,9 +32,11 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       : Array.isArray(emails.extension)
         ? emails.extension
         : [emails.extension]
-  const extensions = rawExtensions.map((extension) =>
-    extension.startsWith(".") ? extension : `.${extension}`,
-  )
+  const extensions = rawExtensions
+    .map((extension) => (extension.startsWith(".") ? extension : `.${extension}`))
+    .map((extension, index) => ({ extension, index }))
+    .sort((left, right) => right.extension.length - left.extension.length || left.index - right.index)
+    .map(({ extension }) => extension)
   const lazy = emails.lazy ?? true
   const standalone = options.standalone ?? false
 
