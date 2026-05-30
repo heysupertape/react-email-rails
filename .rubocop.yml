@@ -1,0 +1,42 @@
+inherit_gem:
+  rubocop-shopify: rubocop.yml
+
+plugins:
+  - rubocop-rails
+  - rubocop-performance
+  - rubocop-minitest
+
+AllCops:
+  StringLiteralsFrozenByDefault: true
+  TargetRubyVersion: 3.3
+  Exclude:
+    - "vendor/**/*"
+
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: never
+
+Rails/UnknownEnv:
+  Environments:
+    - development
+    - test
+    - production
+
+Naming/FileName:
+  Exclude:
+    - "lib/react-email-rails.rb"
+
+Style/ClassAndModuleChildren:
+  EnforcedStyle: compact
+
+Style/HashSyntax:
+  EnforcedShorthandSyntax: always
+
+Style/MethodCallWithArgsParentheses:
+  inherit_mode:
+    override:
+      - Exclude
+      - AllowedMethods
+  EnforcedStyle: require_parentheses
+  Exclude: []
+  AllowedMethods: []
+  IgnoreMacros: false
