@@ -1,16 +1,22 @@
-# react-email-rails
+# Rails + React Email
 
-Send emails using [React Email](https://react.email) components from Rails with Action Mailer.
+Build and send emails using React and Rails. 
 
-The Ruby gem handles mailer integration, props, caching, health checks, and process management. The companion npm package provides a Vite plugin and render runtime.
+Seamless integration between [React Email](https://react.email) components and [Action Mailer](https://guides.rubyonrails.org/action_mailer_basics.html).
 
-## How It Works
+## Why?
+
+Building HTML emails is painfully archaic. [React Email](https://react.email) is a next-generation collection of unstyled components for creating beautiful emails using React, Tailwind, and TypeScript. This gem allows you to bring that power directly into your Rails app.
+
+## How?
 
 **Development:** the gem renders components through Vite's dev pipeline, so email components can use the same module resolution and transforms as the rest of your frontend code. The dev renderer loads only the `reactEmailRails()` plugin plus your `resolve`, `define`, and `css` config — not the rest of your dev-server plugins — so an email that relies on other plugins may behave differently than under `vite build --mode email`. The default `:subprocess` mode boots a fresh dev server per render, which always picks up your latest edits; `:persistent` mode reuses the dev server and is faster but can serve a stale component until the process is recycled.
 
 **Production:** Vite builds a server-side email bundle ahead of time. The gem runs that bundle with Node, sends props to the requested component, and receives rendered HTML and plain text.
 
 Delivery, headers, multipart parts, previews, queues, and callbacks stay normal Action Mailer. If rendering fails, the mail fails closed with `ReactEmailRails::RenderError`.
+
+> **Not using Vite yet?** This project assumes your Rails app is already using Vite for asset management. If you're not, we recommend using [rails_vite](https://github.com/skryukov/rails_vite/).
 
 ## Quick Start
 
@@ -21,18 +27,16 @@ Add the gem:
 gem "react-email-rails"
 ```
 
-Install the npm package and peer dependencies:
-
-```sh
-pnpm add react-email-rails @react-email/render react react-dom
-```
-
-This package assumes your Rails app already has Vite. If you are adding Vite to a Rails app from scratch, we recommend [rails_vite](https://github.com/skryukov/rails_vite/) as the Rails/Vite integration.
-
 Install the optional initializer:
 
 ```sh
 bin/rails generate react_email_rails:install
+```
+
+Install the npm package and peer dependencies:
+
+```sh
+npm i react-email-rails @react-email/render react react-dom
 ```
 
 Add the Vite plugin:
@@ -76,27 +80,23 @@ class AccountMailer < ApplicationMailer
     account = params.fetch(:account)
 
     mail(
+      to: account.email,
+      subject: "Welcome",
       react: {
         account: {
           name: account.name,
         },
-      },
-      to: account.email,
-      subject: "Welcome",
+      },     
     )
   end
 end
 ```
 
-Build the render bundle outside development:
-
-```sh
-vite build --mode email
-```
+That's it! It now works like any other Rails mailer.
 
 ## Usage
 
-`react:` accepts three forms:
+Inside of your mailer, `react:` accepts three forms:
 
 ```ruby
 mail react: { user: }, to:, subject:               # infer component, explicit props
@@ -142,7 +142,9 @@ mail react: {
 }, to:, subject:
 ```
 
-Plain Hashes work well, and so does any object that responds to `as_json`. That includes Active Model objects and serialization libraries like [Alba](https://github.com/okuramasafumi/alba). For TypeScript props, we recommend generating shared Ruby-to-TypeScript types with [Typelizer](https://github.com/jetrockets/typelizer).
+Just like `render json:` in controllers, you can pass any object that responds to `as_json`. That includes plain hashes, Active Model objects, and serialization libraries like [Alba](https://github.com/okuramasafumi/alba) or [ActiveModel::Serializer](https://github.com/rails-api/active_model_serializers). 
+
+For TypeScript props, we recommend generating them with [Typelizer](https://typelizer.dev).
 
 Use `props:` when passing an explicit component name:
 
@@ -193,6 +195,7 @@ end
 The default plugin config discovers `.tsx` and `.jsx` files in `app/javascript/emails` and builds the email SSR bundle only when Vite runs in `email` mode:
 
 ```ts
+// vite.config.ts
 import { defineConfig } from "vite"
 import { reactEmailRails } from "react-email-rails"
 
@@ -383,8 +386,6 @@ Keep the bundle on any process that calls `deliver_now`, renders previews in pro
 ## Using with Inertia Rails
 
 `react-email-rails` was heavily influenced by `inertia-rails` and is designed to feel like a seamless companion to it. Mailers use the same React component and props vocabulary as the rest of an Inertia Rails app, while staying inside Action Mailer's delivery, preview, callback, and multipart conventions.
-
-By default, props are serialized with `as_json` and recursively camelized before they reach React. That matches the shape many Inertia Rails apps already use for page props, so serializers and frontend component conventions can usually be shared between web pages and email components.
 
 ## Requirements
 
