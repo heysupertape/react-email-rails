@@ -16,8 +16,10 @@ export type ReactEmailRailsOptions = {
 
 export type ReactEmailRailsViteOptions = Pick<
   UserConfig,
-  "assetsInclude" | "css" | "define" | "esbuild" | "json" | "oxc" | "plugins" | "resolve"
->
+  "assetsInclude" | "css" | "define" | "esbuild" | "json" | "plugins" | "resolve"
+> & {
+  oxc?: unknown
+}
 
 type PluginMetadata = {
   emails: {
