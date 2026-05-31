@@ -14,6 +14,7 @@ Build and send emails using React and Rails — a seamless integration between [
 - [Deployment](#deployment)
 - [Development](#development)
 - [Contributing](#contributing)
+- [Security](#security)
 - [License](#license)
 
 ## Why
@@ -89,7 +90,7 @@ export default defineConfig({
 Generate a mailer and React Email component:
 
 ```sh
-bin/rails generate react_email_rails:email Account created
+bin/rails generate react_email_rails:email Account welcome
 ```
 
 The generator follows Rails' mailer generator shape: `NAME [method method]`. It creates `app/mailers/account_mailer.rb`, matching components under your configured React Email directory, plus a mailer preview and test.
@@ -97,14 +98,14 @@ The generator follows Rails' mailer generator shape: `NAME [method method]`. It 
 The generator reads `emails.path` and `emails.extension` from `reactEmailRails()` when available. Pass flags to override them:
 
 ```sh
-bin/rails generate react_email_rails:email Account created --emails-path=app/emails --extension=jsx
+bin/rails generate react_email_rails:email Account welcome --emails-path=app/emails --extension=jsx
 ```
 
 Edit the generated mailer to pass any necessary props:
 
 ```ruby
 class AccountMailer < ApplicationMailer
-  def created
+  def welcome
     account = params.fetch(:account)
 
     mail(
@@ -123,22 +124,22 @@ end
 Edit the generated email component:
 
 ```tsx
-// app/javascript/emails/account_mailer/created.tsx
+// app/javascript/emails/account_mailer/welcome.tsx
 
 import { Body, Container, Html, Text } from "@react-email/components"
 
-type CreatedProps = {
+type WelcomeProps = {
   account: {
     name: string
   }
 }
 
-export default function Created({ account }: CreatedProps) {
+export default function Welcome({ account }: WelcomeProps) {
   return (
     <Html>
       <Body>
         <Container>
-          <Text>Welcome to {account.name}</Text>
+          <Text>Welcome, {account.name}</Text>
         </Container>
       </Body>
     </Html>
@@ -172,7 +173,7 @@ Choose the level of inference you want:
 class AccountMailer < ApplicationMailer
   use_react_instance_props
 
-  def created
+  def welcome
     @account = params.fetch(:account)
     mail react: true, to: @account.email, subject: "Welcome"
   end
@@ -218,10 +219,10 @@ Component names are inferred from the mailer and action:
 
 | Mailer action | Component |
 |---------------|-----------|
-| `AccountMailer#created` | `account_mailer/created` |
+| `AccountMailer#welcome` | `account_mailer/welcome` |
 | `Users::InviteMailer#new_invite` | `users/invite_mailer/new_invite` |
 
-Rails derives `account_mailer` from `AccountMailer` via its `mailer_name`. The default Vite plugin resolves those names under `app/javascript/emails`, so `account_mailer/created` maps to `app/javascript/emails/account_mailer/created.tsx` or `.jsx`.
+Rails derives `account_mailer` from `AccountMailer` via its `mailer_name`. The default Vite plugin resolves those names under `app/javascript/emails`, so `account_mailer/welcome` maps to `app/javascript/emails/account_mailer/welcome.tsx` or `.jsx`.
 
 Files and directories starting with `_` are ignored as renderable email entries by default. Use them for shared components such as `_components/email_layout.tsx`; they can still be imported by email components.
 
@@ -267,12 +268,12 @@ export function EmailLayout({ children }: EmailLayoutProps) {
 ```
 
 ```tsx
-// app/javascript/emails/account_mailer/created.tsx
+// app/javascript/emails/account_mailer/welcome.tsx
 
 import { Text } from "@react-email/components"
 import { EmailLayout } from "../_components/email_layout"
 
-export default function Created() {
+export default function Welcome() {
   return (
     <EmailLayout>
       <Text>Welcome</Text>
@@ -298,6 +299,7 @@ If the defaults don't fit, override them in `config/initializers/react_email_rai
 | `render_mode` | `:subprocess` |
 | `render_options` | `{}` |
 | `render_timeout` | `10` seconds |
+| `render_process_max_requests` | `1_000` |
 | `on_render_error` | `nil` |
 | `verify_render_on_boot` | `false` |
 
@@ -343,7 +345,7 @@ Persistent mode keeps one Node child per process:
 
 - Renders are sent as newline-delimited JSON and processed one at a time, so a single child never renders concurrently. Scale throughput by adding worker processes.
 - It is fork-safe: under clustered Puma or forking job runners, each worker spawns its own child.
-- The child is recycled periodically to bound memory growth.
+- The child is recycled after `render_process_max_requests` renders to bound memory growth. Set it to `nil` to disable recycling.
 
 #### Render Options
 
@@ -448,6 +450,8 @@ The plugin registers a dedicated `email` [build environment](https://vite.dev/gu
 
 The bundle is required, not an optimization. If it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent. Make sure `vite build` runs anywhere that renders mail, the same as for the rest of your assets.
 
+The Ruby gem and npm package must stay on the same version. The renderer includes a small protocol/version handshake, so mismatched installs fail with an actionable `ReactEmailRails::RenderError` instead of silently returning malformed output.
+
 ### Custom Vite Builds
 
 To emit the bundle without a dedicated command, the plugin opts your project into Vite's [whole-app build](https://vite.dev/guide/api-environment):
@@ -473,40 +477,15 @@ end
 
 ## Development
 
-Install dependencies:
-
-```sh
-bundle install
-cd vite && pnpm install
-```
-
-Run checks:
-
-```sh
-ruby scripts/check_version_sync.rb
-bin/test
-bin/lint
-cd vite && pnpm run build
-```
-
-Format Ruby and TypeScript/JavaScript code:
-
-```sh
-bin/format
-```
-
-Build release artifacts:
-
-```sh
-bundle exec rake build
-cd vite && pnpm pack --dry-run
-```
-
-The Ruby gem version in `lib/react_email_rails/version.rb` is the source of truth. The npm package still needs a literal `version` in `vite/package.json`, so `cd vite && pnpm pack` syncs that field from the Ruby version before building.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, checks, formatting, and release verification.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub.
+Bug reports and pull requests are welcome on GitHub. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+## Security
+
+Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md) for details.
 
 ## License
 

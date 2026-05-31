@@ -27,7 +27,6 @@ end
 class ActiveSupport::TestCase
   INTERNAL_REACT_EMAIL_CONFIG_METHODS = {
     render_command: :resolved_render_command,
-    render_process_max_requests: :render_process_max_requests,
   }.freeze
 
   def with_react_email_config(**overrides)

@@ -2,17 +2,18 @@ require("test_helper")
 
 class ReactEmailRailsTest < ActiveSupport::TestCase
   RUBY = RbConfig.ruby
+  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
 
   RENDER_FIXED = [
     RUBY,
     "-e",
-    'require "json"; $stdin.read; $stdout.write(JSON.generate(html: "<p>Hi</p>", text: "Hi"))',
+    "require \"json\"; $stdin.read; $stdout.write(JSON.generate(html: \"<p>Hi</p>\", text: \"Hi\", #{RENDER_METADATA}))",
   ].freeze
 
   HEALTH_OK = [
     RUBY,
     "-e",
-    'require "json"; $stdout.write(JSON.generate(ok: true)) if ARGV.include?("--health")',
+    "require \"json\"; $stdout.write(JSON.generate(ok: true, #{RENDER_METADATA})) if ARGV.include?(\"--health\")",
     "--",
   ].freeze
 
@@ -23,7 +24,7 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
       require "json"
       abort "wrong mode" unless ARGV.include?("--persistent") && !ARGV.include?("--health")
       request = JSON.parse($stdin.gets)
-      $stdout.puts(JSON.generate(ok: request["health"] == true))
+      $stdout.puts(JSON.generate(ok: request["health"] == true, #{RENDER_METADATA}))
       $stdout.flush
     RUBY
     "--",
@@ -80,6 +81,19 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
 
   test("healthy? returns false when the command fails") do
     with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
+      assert_not(ReactEmailRails.healthy?)
+    end
+  end
+
+  test("healthy? returns false when the renderer protocol is incompatible") do
+    command = [
+      RUBY,
+      "-e",
+      'require "json"; $stdout.write(JSON.generate(ok: true, protocolVersion: 0, packageVersion: "0.0.0")) if ARGV.include?("--health")',
+      "--",
+    ]
+
+    with_react_email_internals(render_command: command) do
       assert_not(ReactEmailRails.healthy?)
     end
   end
