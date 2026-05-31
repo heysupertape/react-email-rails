@@ -146,7 +146,7 @@ export default function Created({ account }: CreatedProps) {
 }
 ```
 
-> [@react-email/components](https://react.email/docs/components/html) provides the full set of primitives — `<Button>`, `<Heading>`, `<Tailwind>`, and more.
+> [@react-email/components](https://react.email/docs/components/html) provides primitives like `<Button>`, `<Heading>`, `<Tailwind>`, and more.
 
 That's it — it now renders and delivers like any other Action Mailer email.
 
