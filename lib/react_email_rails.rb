@@ -22,6 +22,7 @@ require_relative("react_email_rails/render_modes/persistent")
 require_relative("react_email_rails/render_modes/persistent/server")
 require_relative("react_email_rails/render_modes/persistent/command_runner")
 require_relative("react_email_rails/configuration")
+require_relative("react_email_rails/tasks")
 require_relative("react_email_rails/props_resolver")
 require_relative("react_email_rails/railtie")
 

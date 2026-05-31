@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -55,9 +55,6 @@ async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Pr
       plugins: [reactEmailRails(options)],
       ...extra?.config,
     },
-    // Passing null lets Vite derive whether to build the whole app from the
-    // resolved `builder` option — so this exercises the plugin's opt-in rather
-    // than forcing an app build from the test side.
     null,
   )
   await builder.buildApp()
@@ -65,42 +62,10 @@ async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Pr
 }
 
 describe("vite build", () => {
-  it("emits the email bundle and the client output from a single plain build", async () => {
+  it("builds client assets without building production emails", async () => {
     const root = await buildFixture()
 
-    // The email environment built without a separate `--mode email` step...
-    expect(existsSync(join(root, "tmp/react-email-rails/emails.js"))).toBe(true)
-    // ...with Node dependencies inlined by default...
-    expect(readFileSync(join(root, "tmp/react-email-rails/emails.js"), "utf8")).not.toMatch(
-      /from\s*"(react|@react-email\/render)"/,
-    )
-    // ...and the client environment still built in the same pass.
     expect(existsSync(join(root, "dist-client/index.html"))).toBe(true)
-  }, 60_000)
-
-  it("externalizes dependencies when standalone is false", async () => {
-    const root = await buildFixture({ standalone: false })
-
-    const bundle = readFileSync(join(root, "tmp/react-email-rails/emails.js"), "utf8")
-    expect(bundle).toContain("@react-email/render")
-  }, 60_000)
-
-  it("builds the email bundle alongside a user-defined environment in one pass", async () => {
-    // Opting into the whole-app build means any environment the host already
-    // defines builds in the same pass — it must coexist with, not replace, them.
-    const root = await buildFixture(undefined, {
-      config: {
-        environments: {
-          ssr: {
-            build: { ssr: true, outDir: "dist-ssr", rollupOptions: { input: "/ssr-entry.js" } },
-          },
-        },
-      },
-      files: { "ssr-entry.js": "export const ssr = true\n" },
-    })
-
-    expect(existsSync(join(root, "dist-client/index.html"))).toBe(true)
-    expect(existsSync(join(root, "dist-ssr"))).toBe(true)
-    expect(existsSync(join(root, "tmp/react-email-rails/emails.js"))).toBe(true)
+    expect(existsSync(join(root, "tmp/react-email-rails/emails.js"))).toBe(false)
   }, 60_000)
 })
