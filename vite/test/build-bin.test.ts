@@ -1,5 +1,6 @@
 import { execFile as execFileCallback } from "node:child_process"
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -8,6 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { promisify } from "node:util"
@@ -122,6 +124,49 @@ describe("react-email-rails-build", () => {
     expect(output).toContain("@react-email/render")
 
     const { stdout } = await execFile("node", [bundlePath, "--health"], { cwd: root })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protocolVersion: 1 })
+  }, 60_000)
+
+  it("emits a standalone email bundle by default", async () => {
+    const root = mkdtempSync(join(pkgRoot, "node_modules", ".rer-build-bin-standalone-"))
+    const isolated = mkdtempSync(join(tmpdir(), "rer-standalone-"))
+    fixtures.push(root, isolated)
+
+    mkdirSync(join(root, "app/frontend/emails/account_mailer"), { recursive: true })
+    writeFileSync(
+      join(root, "vite.config.ts"),
+      [
+        `import { defineConfig } from "vite"`,
+        `import { reactEmailRails } from ${JSON.stringify(
+          pathToFileURL(join(pkgRoot, "dist/index.js")).href,
+        )}`,
+        ``,
+        `export default defineConfig({`,
+        `  resolve: { alias: { "react-email-rails/runtime": ${JSON.stringify(runtimeEntry)} } },`,
+        `  plugins: [reactEmailRails({ emails: "app/frontend/emails" })],`,
+        `})`,
+        ``,
+      ].join("\n"),
+    )
+    writeFileSync(
+      join(root, "app/frontend/emails/account_mailer/created.tsx"),
+      [
+        `import { createElement } from "react"`,
+        ``,
+        `export default function Created() {`,
+        `  return createElement("p", null, "Standalone")`,
+        `}`,
+        ``,
+      ].join("\n"),
+    )
+
+    await execFile("node", [join(pkgRoot, "bin/build.mjs")], { cwd: root })
+
+    const bundlePath = join(root, "tmp/react-email-rails/emails.js")
+    const isolatedBundlePath = join(isolated, "emails.js")
+    copyFileSync(bundlePath, isolatedBundlePath)
+
+    const { stdout } = await execFile("node", [isolatedBundlePath, "--health"], { cwd: isolated })
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, protocolVersion: 1 })
   }, 60_000)
 })

@@ -16,11 +16,12 @@ afterAll(() => {
 })
 
 type Extra = { config?: InlineConfig; files?: Record<string, string> }
+type BuildResult = { root: string; resolveCalls: number; loadCalls: number }
 
 // Build a throwaway app through the plugin and return its root. The fixture is
 // rooted under node_modules so React and @react-email/render resolve from the
 // package's own dependencies, and so the scratch output stays gitignored.
-async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Promise<string> {
+async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Promise<BuildResult> {
   const root = mkdtempSync(join(pkgRoot, "node_modules", ".rer-build-"))
   fixtures.push(root)
 
@@ -34,6 +35,14 @@ async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Pr
   // test stays focused on build orchestration rather than the host's JSX setup.
   writeFileSync(
     join(root, "app/javascript/emails/account_mailer/created.tsx"),
+    'import "email-only-missing-module"\n' +
+      'import { createElement } from "react"\n\n' +
+      "export default function Created({ account }: { account: { name: string } }) {\n" +
+      '  return createElement("p", null, `Welcome to ${account.name}`)\n' +
+      "}\n",
+  )
+  writeFileSync(
+    join(root, "app/javascript/emails/account_mailer/partial.tsx"),
     'import { createElement } from "react"\n\n' +
       "export default function Created({ account }: { account: { name: string } }) {\n" +
       '  return createElement("p", null, `Welcome to ${account.name}`)\n' +
@@ -45,6 +54,12 @@ async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Pr
     writeFileSync(absolutePath, content)
   }
 
+  const plugin = reactEmailRails(options)
+  let resolveCalls = 0
+  let loadCalls = 0
+  wrapHook(plugin, "resolveId", () => resolveCalls++)
+  wrapHook(plugin, "load", () => loadCalls++)
+
   const builder = await createBuilder(
     {
       root,
@@ -52,20 +67,52 @@ async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Pr
       logLevel: "silent",
       build: { outDir: "dist-client" },
       resolve: { alias: { "react-email-rails/runtime": runtimeEntry } },
-      plugins: [reactEmailRails(options)],
+      plugins: [plugin],
       ...extra?.config,
     },
     null,
   )
   await builder.buildApp()
-  return root
+  return { root, resolveCalls, loadCalls }
 }
 
 describe("vite build", () => {
   it("builds client assets without building production emails", async () => {
-    const root = await buildFixture()
+    const { root, resolveCalls, loadCalls } = await buildFixture()
 
     expect(existsSync(join(root, "dist-client/index.html"))).toBe(true)
     expect(existsSync(join(root, "tmp/react-email-rails/emails.js"))).toBe(false)
+    expect(resolveCalls).toBe(0)
+    expect(loadCalls).toBe(0)
   }, 60_000)
 })
+
+function wrapHook(
+  plugin: ReturnType<typeof reactEmailRails>,
+  name: "resolveId" | "load",
+  onCall: () => void,
+): void {
+  const hook = plugin[name] as
+    | ((...args: unknown[]) => unknown)
+    | { handler: (...args: unknown[]) => unknown }
+    | undefined
+
+  if (!hook) return
+
+  if (typeof hook === "function") {
+    plugin[name] = function (this: unknown, ...args: unknown[]) {
+      onCall()
+      return hook.apply(this, args)
+    } as never
+    return
+  }
+
+  const handler = hook.handler
+  plugin[name] = {
+    ...hook,
+    handler(this: unknown, ...args: unknown[]) {
+      onCall()
+      return handler.apply(this, args)
+    },
+  } as never
+}

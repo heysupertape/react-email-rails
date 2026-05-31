@@ -185,14 +185,22 @@ describe("serve stdout isolation", () => {
 describe("reactEmailRails plugin", () => {
   it("resolves and loads the server virtual module with the configured glob", () => {
     const plugin = reactEmailRails({ emails: { path: "app/javascript/emails" } })
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')
     expect(source).toContain('const extensions = [".tsx",".jsx"]')
     expect(source).toContain("export const run")
+  })
+
+  it("filters virtual module hooks so host builds skip unrelated ids", () => {
+    const plugin = reactEmailRails()
+    const resolveId = plugin.resolveId as FilteredHook<(id: string) => string | undefined, RegExp>
+    const load = plugin.load as FilteredHook<(id: string) => string | undefined, RegExp>
+
+    expect(resolveId.filter.id.test("virtual:react-email-rails/server")).toBe(true)
+    expect(resolveId.filter.id.test("react")).toBe(false)
+    expect(load.filter.id.test("\0virtual:react-email-rails/server")).toBe(true)
+    expect(load.filter.id.test("/app/frontend/main.tsx")).toBe(false)
   })
 
   it("keeps normalized plugin metadata for Rails generators behind an internal symbol", () => {
@@ -230,10 +238,7 @@ describe("reactEmailRails plugin", () => {
 
   it("ignores underscore-prefixed partials by default", () => {
     const plugin = reactEmailRails()
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"!/app/javascript/emails/**/_*"')
     expect(source).toContain('"!/app/javascript/emails/**/_*/**"')
@@ -241,10 +246,7 @@ describe("reactEmailRails plugin", () => {
 
   it("accepts a custom ignore list and replaces the default", () => {
     const plugin = reactEmailRails({ emails: { ignore: ["shared/**", "components/**"] } })
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"!/app/javascript/emails/shared/**"')
     expect(source).toContain('"!/app/javascript/emails/components/**"')
@@ -253,17 +255,14 @@ describe("reactEmailRails plugin", () => {
 
   it("emits a plain string glob when ignore is disabled", () => {
     const plugin = reactEmailRails({ emails: { ignore: [] } })
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('import.meta.glob("/app/javascript/emails/**/*{.tsx,.jsx}")')
   })
 
   it("registers the email build environment for the dedicated renderer", () => {
     const plugin = reactEmailRails()
-    const config = (plugin.config as () => EmailConfig)()
+    const config = pluginConfig(plugin, "build")
 
     expect(config.builder).toBeUndefined()
     expect(config.environments.email.build).toMatchObject({
@@ -279,34 +278,35 @@ describe("reactEmailRails plugin", () => {
 
   it("inlines dependencies for the email build by default", () => {
     const plugin = reactEmailRails()
-    const config = (plugin.config as () => EmailConfig)()
+    const config = pluginConfig(plugin, "build")
 
     expect(config.environments.email.resolve).toMatchObject({ noExternal: true })
   })
 
+  it("keeps dev module-runner dependencies external even when standalone is true", () => {
+    const plugin = reactEmailRails()
+    const config = pluginConfig(plugin, "serve")
+
+    expect(config.environments.email.resolve).toBeUndefined()
+  })
+
   it("externalizes dependencies for the email build when standalone is false", () => {
     const plugin = reactEmailRails({ standalone: false })
-    const config = (plugin.config as () => EmailConfig)()
+    const config = pluginConfig(plugin, "build")
 
     expect(config.environments.email.resolve).toBeUndefined()
   })
 
   it("accepts an emails string shorthand for the directory", () => {
     const plugin = reactEmailRails({ emails: "app/emails" })
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/emails/**/*{.tsx,.jsx}"')
   })
 
   it("keeps runtime render options out of the Vite virtual server", () => {
     const plugin = reactEmailRails()
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain("serve(registry)")
     expect(source).not.toContain("renderOptions")
@@ -322,10 +322,7 @@ describe("reactEmailRails plugin", () => {
     ).toBe("account_mailer/created")
 
     const plugin = reactEmailRails({ emails: { extension: ["tsx", ".jsx"] } })
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')
     expect(source).toContain('const extensions = [".tsx",".jsx"]')
@@ -333,15 +330,46 @@ describe("reactEmailRails plugin", () => {
 
   it("matches longer overlapping extensions before shorter suffixes", () => {
     const plugin = reactEmailRails({ emails: { extension: ["tsx", ".email.tsx"] } })
-    const resolved = (plugin.resolveId as (id: string) => string | undefined)(
-      "virtual:react-email-rails/server",
-    )
-    const source = (plugin.load as (id: string) => string | undefined)(resolved!)
+    const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/javascript/emails/**/*{.email.tsx,.tsx}"')
     expect(source).toContain('const extensions = [".email.tsx",".tsx"]')
   })
 })
+
+type FilteredHook<T, I = RegExp> = {
+  filter: { id: I }
+  handler: T
+}
+
+function loadVirtualServer(plugin: ReturnType<typeof reactEmailRails>): string {
+  const resolved = resolveId(plugin, "virtual:react-email-rails/server")
+
+  return load(plugin, resolved!)
+}
+
+function resolveId(plugin: ReturnType<typeof reactEmailRails>, id: string): string | undefined {
+  const hook = plugin.resolveId as FilteredHook<(id: string) => string | undefined>
+
+  return hook.handler(id)
+}
+
+function load(plugin: ReturnType<typeof reactEmailRails>, id: string): string {
+  const hook = plugin.load as FilteredHook<(id: string) => string | undefined>
+  const source = hook.handler(id)
+
+  if (!source) throw new Error(`expected source for ${id}`)
+  return source
+}
+
+function pluginConfig(plugin: ReturnType<typeof reactEmailRails>, command: "build" | "serve") {
+  const hook = plugin.config as unknown as (
+    config: Record<string, never>,
+    env: { command: "build" | "serve"; mode: string; isSsrBuild?: boolean; isPreview?: boolean },
+  ) => EmailConfig
+
+  return hook({}, { command, mode: command === "build" ? "production" : "development" })
+}
 
 function streamFromChunks(chunks: string[]): AsyncIterable<string> & { setEncoding: () => void } {
   return {

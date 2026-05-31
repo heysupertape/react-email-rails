@@ -1,4 +1,4 @@
-import type { Plugin, UserConfig } from "vite"
+import type { ConfigEnv, Plugin, UserConfig } from "vite"
 
 export type EmailsOption =
   | string
@@ -39,6 +39,7 @@ const VIRTUAL_SERVER = "virtual:react-email-rails/server"
 const VIRTUAL_MAIN = "virtual:react-email-rails/main"
 const RESOLVED_SERVER = `\0${VIRTUAL_SERVER}`
 const RESOLVED_MAIN = `\0${VIRTUAL_MAIN}`
+const VIRTUAL_MODULE_PATTERN = /virtual:react-email-rails\/(?:server|main)$/
 
 // The dedicated build environment that emits the server-side email bundle.
 export const EMAIL_ENVIRONMENT = "email"
@@ -81,41 +82,49 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
   const plugin: Plugin = {
     name: "react-email-rails",
 
-    resolveId(id) {
-      if (id === VIRTUAL_SERVER) return RESOLVED_SERVER
-      if (id === VIRTUAL_MAIN) return RESOLVED_MAIN
+    resolveId: {
+      filter: { id: VIRTUAL_MODULE_PATTERN },
+      handler(id) {
+        if (id === VIRTUAL_SERVER) return RESOLVED_SERVER
+        if (id === VIRTUAL_MAIN) return RESOLVED_MAIN
+      },
     },
 
-    load(id) {
-      if (id === RESOLVED_SERVER) {
-        return [
-          `import { serve, toComponentName } from "react-email-rails/runtime"`,
-          `const modules = import.meta.glob(${globArg})`,
-          `const extensions = ${JSON.stringify(extensions)}`,
-          `const registry = Object.create(null)`,
-          `for (const path in modules) {`,
-          `  const extension = extensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
-          `  registry[toComponentName(path, ${JSON.stringify(root)}, extension)] = modules[path]`,
-          `}`,
-          `export const run = () => serve(registry)`,
-        ].join("\n")
-      }
+    load: {
+      filter: { id: VIRTUAL_MODULE_PATTERN },
+      handler(id) {
+        if (id === RESOLVED_SERVER) {
+          return [
+            `import { serve, toComponentName } from "react-email-rails/runtime"`,
+            `const modules = import.meta.glob(${globArg})`,
+            `const extensions = ${JSON.stringify(extensions)}`,
+            `const registry = Object.create(null)`,
+            `for (const path in modules) {`,
+            `  const extension = extensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
+            `  registry[toComponentName(path, ${JSON.stringify(root)}, extension)] = modules[path]`,
+            `}`,
+            `export const run = () => serve(registry)`,
+          ].join("\n")
+        }
 
-      if (id === RESOLVED_MAIN) {
-        return `import { run } from ${JSON.stringify(VIRTUAL_SERVER)}\nrun()\n`
-      }
+        if (id === RESOLVED_MAIN) {
+          return `import { run } from ${JSON.stringify(VIRTUAL_SERVER)}\nrun()\n`
+        }
+      },
     },
 
-    config() {
+    config(_config, env: ConfigEnv) {
       // Register a dedicated `email` build environment. The official
       // react-email-rails-build bin opts into building it with an isolated
       // plugin stack so host app plugins cannot break email SSR builds.
-      // The environment is a server consumer. Standalone builds inline Node
-      // dependencies by default so Rails runtime images do not need node_modules.
+      // The environment is a server consumer. Production standalone builds inline
+      // Node dependencies by default so Rails runtime images do not need
+      // node_modules; dev rendering keeps dependencies external for Vite's module
+      // runner.
       return {
         environments: {
           [EMAIL_ENVIRONMENT]: {
-            ...(standalone ? { resolve: { noExternal: true } } : {}),
+            ...(standalone && env.command === "build" ? { resolve: { noExternal: true } } : {}),
             build: {
               ssr: true,
               outDir: OUT_DIR,
