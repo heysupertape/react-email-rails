@@ -35,35 +35,6 @@ cd vite && pnpm pack --dry-run
 
 Releases are tag-driven. Pushing `vX.Y.Z` to GitHub runs `.github/workflows/release.yml`, publishes the Ruby gem to RubyGems, publishes the Vite package to npm, and creates the GitHub Release with the built `.gem` and `.tgz` artifacts.
 
-### One-time Registry Setup
-
-Configure RubyGems trusted publishing:
-
-- For the first release, create a pending trusted publisher for gem `react-email-rails`.
-- Repository owner: `heysupertape`
-- Repository name: `react-email-rails`
-- Workflow filename: `release.yml`
-- Environment: leave blank
-
-Configure npm trusted publishing for package `react-email-rails`:
-
-- Publisher: GitHub Actions
-- Organization or user: `heysupertape`
-- Repository: `react-email-rails`
-- Workflow filename: `release.yml`
-- Environment name: leave blank
-- Allowed actions: `npm publish`
-
-npm only allows trusted publishing to be configured after the package already exists. For the first npm release only, add an `NPM_TOKEN` repository secret with permission to publish `react-email-rails`, push the first release tag, then delete the secret after the package is published. Once the package exists, configure trusted publishing in the npm UI or with:
-
-```sh
-cd vite
-npm install --global npm@^11.10.0
-npm trust github react-email-rails --repo heysupertape/react-email-rails --file release.yml --allow-publish
-```
-
-Do not add RubyGems tokens to GitHub secrets. Do not keep an npm publish token in GitHub after the first package publish. Normal releases use short-lived OIDC credentials from the registries.
-
 ### Patch, Minor, and Major Releases
 
 Prepare the version bump:
