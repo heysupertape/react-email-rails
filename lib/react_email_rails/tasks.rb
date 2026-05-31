@@ -14,6 +14,13 @@ module ReactEmailRails::Tasks
       FileUtils.rm_rf(Rails.root.join(File.dirname(ReactEmailRails::Configuration::BUNDLE_PATH)))
     end
 
+    def verify
+      return if ReactEmailRails.healthy?
+
+      command = ReactEmailRails.configuration.send(:resolved_render_command)
+      raise("react-email-rails renderer verification failed for command: #{command.inspect}")
+    end
+
     private
 
     def build_command

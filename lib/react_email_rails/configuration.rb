@@ -27,14 +27,11 @@ class ReactEmailRails::Configuration
     end
   end
 
-  DEFAULT_VERIFY_RENDER_ON_BOOT = false
-
   attr_accessor(
     :component_path_resolver,
     :render_options,
     :transform_props,
     :on_render_error,
-    :verify_render_on_boot,
   )
   attr_reader(
     :render_mode,
@@ -52,13 +49,8 @@ class ReactEmailRails::Configuration
         config.render_process_max_requests = DEFAULT_RENDER_PROCESS_MAX_REQUESTS
         config.transform_props = :lower_camel
         config.on_render_error = nil
-        config.verify_render_on_boot = DEFAULT_VERIFY_RENDER_ON_BOOT
       end
     end
-  end
-
-  def verify_render_on_boot?
-    verify_render_on_boot.respond_to?(:call) ? !!verify_render_on_boot.call : !!verify_render_on_boot
   end
 
   def render_mode=(value)

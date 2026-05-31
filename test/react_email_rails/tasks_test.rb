@@ -3,6 +3,15 @@ require("fileutils")
 require("rake")
 
 class ReactEmailRails::TasksTest < ActiveSupport::TestCase
+  RUBY = RbConfig.ruby
+  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
+  HEALTH_OK = [
+    RUBY,
+    "-e",
+    "require \"json\"; $stdout.write(JSON.generate(ok: true, #{RENDER_METADATA})) if ARGV.include?(\"--health\")",
+    "--",
+  ].freeze
+
   test("build runs the package build command") do
     Dir.mktmpdir do |dir|
       marker = File.join(dir, "built")
@@ -70,6 +79,20 @@ class ReactEmailRails::TasksTest < ActiveSupport::TestCase
     end
 
     assert_includes(error.message, "react-email-rails build command not found")
+  end
+
+  test("verify passes when the renderer reports healthy") do
+    with_react_email_internals(render_command: HEALTH_OK) do
+      assert_nil(ReactEmailRails::Tasks.verify)
+    end
+  end
+
+  test("verify raises with the resolved command when the renderer is unhealthy") do
+    with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
+      error = assert_raises(RuntimeError) { ReactEmailRails::Tasks.verify }
+
+      assert_includes(error.message, "renderer verification failed for command:")
+    end
   end
 
   test("railtie hooks the build task into Rails build tasks") do
