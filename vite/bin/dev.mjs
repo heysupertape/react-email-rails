@@ -19,7 +19,19 @@ const logger = {
   hasWarned: false,
 }
 
+const divertStdout = () => {
+  const write = process.stdout.write.bind(process.stdout)
+  process.stdout.write = (chunk, encoding, callback) => {
+    if (typeof encoding === "function") return process.stderr.write(chunk, encoding)
+    return process.stderr.write(chunk, encoding, callback)
+  }
+  return () => {
+    process.stdout.write = write
+  }
+}
+
 // Load only this plugin and aliases; host dev-server plugins have global side effects.
+const restoreStdout = divertStdout()
 const { userConfig, plugin, vite } = await loadReactEmailRailsConfig({
   command: "serve",
   mode: "development",
@@ -49,6 +61,7 @@ if (!isRunnableDevEnvironment(environment)) {
 
 try {
   const { run } = await environment.runner.import("virtual:react-email-rails/server")
+  restoreStdout()
   await run()
 } finally {
   await server.close()

@@ -391,10 +391,9 @@ Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
-  Rails.logger.info(
-    "[react-email-rails] rendered #{event.payload[:component]} " \
-    "(#{event.payload[:html_bytes]} bytes) in #{event.duration.round(1)}ms"
-  )
+  next if event.payload[:exception]
+
+  Rails.logger.info("[react-email-rails] Rendered #{event.payload[:component]} (Duration: #{event.duration.round}ms | Size: #{event.payload[:html_bytes]} bytes)")
 end
 ```
 
@@ -411,7 +410,7 @@ In development and production, the isolated renderer loads the `reactEmailRails(
 | `emails.path` | `"app/javascript/emails"` | Directory containing email components |
 | `emails.extension` | `[".tsx", ".jsx"]` | Component extension, or an array of extensions |
 | `emails.ignore` | `["**/_*", "**/_*/**"]` | Glob patterns ignored under `emails.path` |
-| `standalone` | `true` | Inline SSR dependencies with `ssr.noExternal: true` |
+| `standalone` | `true` | Inline production email bundle dependencies |
 | `vite` | `{}` | Extra email-only Vite config for compilation and resolution |
 
 Use a custom directory:
@@ -458,7 +457,7 @@ These `vite` options are used by `react-email-rails-dev` and `react-email-rails-
 
 #### Standalone Builds
 
-By default the email bundle inlines React, `@react-email/render`, and other Node dependencies. That makes the bundle larger, but it works well for Rails deploys that build assets in one stage and run without `node_modules` in the final runtime image.
+By default the production email bundle inlines React, `@react-email/render`, and other Node dependencies. That makes the bundle larger, but it works well for Rails deploys that build assets in one stage and run without `node_modules` in the final runtime image. Development previews keep dependencies external for Vite's module runner, even when `standalone` is enabled.
 
 Set `standalone: false` when your runtime already ships `node_modules` and you prefer a smaller SSR-style bundle:
 
