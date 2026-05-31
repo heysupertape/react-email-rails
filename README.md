@@ -19,7 +19,7 @@ Build and send emails using React and Rails — a seamless integration between [
 
 ## Why
 
-Building HTML emails is painfully archaic. [React Email](https://react.email) is a collection of unstyled components for building emails with React, Tailwind, and TypeScript. This gem brings that power directly into your Rails app: write emails as React components and send them through Action Mailer.
+Building HTML emails is painfully archaic. [React Email](https://react.email) is a collection of unstyled components for building emails with React, Tailwind, and TypeScript. This gem brings that power directly into your Rails app. Write emails as React components, send them through Action Mailer, and recipients get automatically generated HTML and text emails.
 
 ## How
 
@@ -27,7 +27,7 @@ Building HTML emails is painfully archaic. [React Email](https://react.email) is
 
 **In production,** Rails builds a server-side email bundle during `assets:precompile`. The bundled rake task runs an isolated email-only Vite build, using `reactEmailRails()` in your app's Vite config for discovery and options.
 
-Delivery, headers, multipart parts, previews, queues, and callbacks all stay normal Action Mailer. If rendering fails, no email is sent and `ReactEmailRails::RenderError` is raised.
+React Email Rails automatically renders both HTML and plain-text versions from the same component. Delivery, headers, previews, queues, and callbacks all stay normal Action Mailer. If rendering fails, no email is sent and `ReactEmailRails::RenderError` is raised.
 
 ## Status
 
