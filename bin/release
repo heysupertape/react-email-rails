@@ -44,8 +44,9 @@ abort("#{release_ref} vite/package.json version #{package_version.inspect} does 
 
 changelog = run("git", "show", "#{release_ref}:CHANGELOG.md", capture: true)
 abort("#{release_ref} CHANGELOG.md is missing a ## #{version} section") unless changelog.match?(/^## #{Regexp.escape(version)}$/)
-if changelog.match?(/^## #{Regexp.escape(version)}\n\n(?<notes>.*?)(?=\n## |\z)/m) &&
-    (Regexp.last_match[:notes].strip.empty? || Regexp.last_match[:notes].match?(/\b(TODO|TBD)\b/i))
+release_notes_match = changelog.match(/^## #{Regexp.escape(version)}\n\n(?<notes>.*?)(?=\n## |\z)/m)
+if release_notes_match &&
+    (release_notes_match[:notes].strip.empty? || release_notes_match[:notes].match?(/\b(TODO|TBD)\b/i))
   abort("#{release_ref} CHANGELOG.md section ## #{version} needs release notes before publishing")
 end
 
