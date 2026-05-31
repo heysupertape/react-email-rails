@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.34.1
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Validate release tag
+        run: ruby scripts/check_release_tag.rb "$GITHUB_REF_NAME"
+
+      - name: Verify Ruby package
+        run: |
+          ruby scripts/check_version_sync.rb
+          bundle exec rake
+          bundle exec rubocop
+          bundle exec rake build
+
+      - name: Install Vite package dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: vite
+
+      - name: Verify Vite package
+        run: |
+          pnpm run ci
+          pnpm pack --dry-run
+        working-directory: vite
+
+  publish:
+    name: Publish packages
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.34.1
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install --global npm@^11
+          npm --version
+
+      - name: Validate release tag
+        id: release
+        run: ruby scripts/check_release_tag.rb "$GITHUB_REF_NAME"
+
+      - name: Check npm bootstrap token
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            npm whoami
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Build gem
+        run: |
+          rm -rf pkg
+          bundle exec rake build
+
+      - name: Configure RubyGems trusted publisher credentials
+        uses: rubygems/configure-rubygems-credentials@v2
+
+      - name: Publish gem to RubyGems
+        run: gem push "${{ steps.release.outputs.gem_path }}"
+
+      - name: Install Vite package dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: vite
+
+      - name: Build Vite package
+        run: pnpm run build
+        working-directory: vite
+
+      - name: Pack npm package
+        run: npm pack --pack-destination ../pkg
+        working-directory: vite
+
+      - name: Publish package to npm
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            unset NODE_AUTH_TOKEN
+          fi
+
+          npm publish "../pkg/${{ steps.release.outputs.npm_package }}" --access public --provenance
+        working-directory: vite
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract release notes
+        run: ruby scripts/extract_changelog.rb "${{ steps.release.outputs.version }}" > .release-notes.md
+
+      - name: Create GitHub release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "${{ steps.release.outputs.gem_path }}" \
+            "pkg/${{ steps.release.outputs.npm_package }}" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file .release-notes.md \
+            --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
