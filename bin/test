@@ -5,4 +5,5 @@ cd "$(dirname "$0")/.."
 bundle exec rake
 
 cd vite
+pnpm build
 pnpm test
