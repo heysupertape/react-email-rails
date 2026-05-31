@@ -2,29 +2,30 @@ require("test_helper")
 
 class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
   RUBY = RbConfig.ruby
+  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
 
   ECHO_INPUT = [
     RUBY,
     "-e",
-    'require "json"; $stdout.write(JSON.generate(html: $stdin.read, text: ""))',
+    "require \"json\"; $stdout.write(JSON.generate(html: $stdin.read, text: \"\", #{RENDER_METADATA}))",
   ].freeze
 
   RENDER_FIXED = [
     RUBY,
     "-e",
-    'require "json"; $stdin.read; $stdout.write(JSON.generate(html: "<p>Hello</p>", text: "Hello"))',
+    "require \"json\"; $stdin.read; $stdout.write(JSON.generate(html: \"<p>Hello</p>\", text: \"Hello\", #{RENDER_METADATA}))",
   ].freeze
 
   RENDER_PERSISTENT = [
     RUBY,
     "-e",
-    <<~'RUBY',
+    <<~RUBY,
       require "json"
       abort "missing persistent flag" unless ARGV.include?("--persistent")
       while (line = $stdin.gets)
         request = JSON.parse(line)
         name = request.fetch("props").fetch("name")
-        $stdout.puts(JSON.generate(ok: true, html: "<p>Hello #{name}</p>", text: "Hello #{name}"))
+        $stdout.puts(JSON.generate(ok: true, html: "<p>Hello \#{name}</p>", text: "Hello \#{name}", #{RENDER_METADATA}))
         $stdout.flush
       end
     RUBY
@@ -62,7 +63,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     <<~RUBY,
       require "json"
       $stdin.gets
-      $stdout.puts(JSON.generate(ok: true, html: "x" * (1024 * 1024), text: ""))
+      $stdout.puts(JSON.generate(ok: true, html: "x" * (1024 * 1024), text: "", #{RENDER_METADATA}))
       $stdout.flush
     RUBY
     "--",
@@ -74,7 +75,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     <<~RUBY,
       require "json"
       while $stdin.gets
-        $stdout.puts(JSON.generate(ok: true, html: "<p>Hello</p>", text: Process.pid.to_s))
+        $stdout.puts(JSON.generate(ok: true, html: "<p>Hello</p>", text: Process.pid.to_s, #{RENDER_METADATA}))
         $stdout.flush
       end
     RUBY
@@ -152,6 +153,43 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     end
 
     assert_includes(error.message, "invalid JSON")
+  end
+
+  test("raises render error when the renderer protocol is incompatible") do
+    error = assert_raises(ReactEmailRails::RenderError) do
+      with_react_email_internals(
+        render_command: [RUBY, "-e", 'require "json"; $stdout.write(JSON.generate(html: "<p>Hello</p>", text: "Hello", protocolVersion: 0, packageVersion: "0.0.0"))'],
+      ) do
+        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+      end
+    end
+
+    assert_includes(error.message, "renderer version mismatch")
+  end
+
+  test("raises render error when the renderer omits html") do
+    error = assert_raises(ReactEmailRails::RenderError) do
+      with_react_email_internals(
+        render_command: [RUBY, "-e", "require \"json\"; $stdout.write(JSON.generate(text: \"Hello\", #{RENDER_METADATA}))"],
+      ) do
+        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+      end
+    end
+
+    assert_includes(error.message, "missing \"html\"")
+  end
+
+  test("raises actionable render error when the default production bundle is missing") do
+    missing_bundle = File.join(Dir.tmpdir, "react-email-rails-missing", ReactEmailRails::Configuration::BUNDLE_PATH)
+
+    error = assert_raises(ReactEmailRails::RenderError) do
+      with_react_email_internals(render_command: ["node", missing_bundle]) do
+        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+      end
+    end
+
+    assert_includes(error.message, "email bundle not found")
+    assert_includes(error.message, "vite build")
   end
 
   test("raises actionable render error when the command is missing") do
@@ -252,11 +290,8 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
   end
 
   test("persistent render mode recycles after the configured request count") do
-    rendered = with_react_email_internals(
-      render_command: RENDER_PERSISTENT_PID,
-      render_process_max_requests: 1,
-    ) do
-      with_react_email_config(render_mode: :persistent) do
+    rendered = with_react_email_internals(render_command: RENDER_PERSISTENT_PID) do
+      with_react_email_config(render_mode: :persistent, render_process_max_requests: 1) do
         [
           ReactEmailRails.render(component: "users/welcome", props: {}),
           ReactEmailRails.render(component: "users/welcome", props: {}),

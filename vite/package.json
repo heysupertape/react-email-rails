@@ -4,7 +4,17 @@
   "description": "Build and send emails using React and Rails",
   "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@10.34.1",
+  "homepage": "https://github.com/heysupertape/react-email-rails#readme",
+  "bugs": {
+    "url": "https://github.com/heysupertape/react-email-rails/issues"
+  },
+  "keywords": [
+    "rails",
+    "react-email",
+    "actionmailer",
+    "vite",
+    "email"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/heysupertape/react-email-rails.git",

@@ -73,14 +73,22 @@ class ReactEmailRails::RenderModes::Persistent::Server
     response = request(input, timeout:)
     return failure(response["error"].to_s.presence || "render process failed") unless response["ok"]
 
-    success(JSON.generate(html: response.fetch("html"), text: response["text"].to_s))
+    success(JSON.generate(
+      {
+        protocolVersion: response["protocolVersion"],
+        packageVersion: response["packageVersion"],
+      }.tap do |body|
+        body[:html] = response["html"] if response.key?("html")
+        body[:text] = response["text"] if response.key?("text")
+      end,
+    ))
   rescue JSON::ParserError => e
     failure("render process returned invalid JSON: #{e.message}")
   end
 
   def health_check_once(timeout:)
     response = request(JSON.generate(health: true), timeout:)
-    response["ok"] ? success(JSON.generate(ok: true)) : failure(response["error"].to_s.presence || "render process failed")
+    response["ok"] ? success(JSON.generate(response)) : failure(response["error"].to_s.presence || "render process failed")
   rescue JSON::ParserError => e
     failure("render process returned invalid JSON: #{e.message}")
   end

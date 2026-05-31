@@ -25,9 +25,8 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
 
   test("rejects unknown render mode shortcuts") do
     config = ReactEmailRails::Configuration.default
-    config.render_mode = :unknown
 
-    error = assert_raises(ArgumentError) { config.resolved_render_mode }
+    error = assert_raises(ArgumentError) { config.render_mode = :unknown }
 
     assert_equal("Unknown react-email-rails render mode: :unknown", error.message)
   end
@@ -93,7 +92,29 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     assert_not_respond_to(config, :cache_version=)
     assert_not_respond_to(config, :prop_serializer=)
     assert_not_respond_to(config, :render_command=)
-    assert_not_respond_to(config, :render_process_max_requests=)
+  end
+
+  test("defaults persistent render process recycling to a bounded request count") do
+    assert_equal(1_000, ReactEmailRails::Configuration.default.render_process_max_requests)
+  end
+
+  test("rejects invalid render timeout values") do
+    config = ReactEmailRails::Configuration.default
+
+    assert_raises(ArgumentError) { config.render_timeout = 0 }
+    assert_raises(ArgumentError) { config.render_timeout = "10" }
+  end
+
+  test("allows disabling or tuning persistent render process recycling") do
+    config = ReactEmailRails::Configuration.default
+
+    config.render_process_max_requests = nil
+    assert_nil(config.render_process_max_requests)
+
+    config.render_process_max_requests = 50
+    assert_equal(50, config.render_process_max_requests)
+
+    assert_raises(ArgumentError) { config.render_process_max_requests = 0 }
   end
 
   test("render options default to an empty hash") do

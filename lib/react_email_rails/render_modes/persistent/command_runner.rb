@@ -6,7 +6,7 @@ class ReactEmailRails::RenderModes::Persistent::CommandRunner
 
     def healthy?(command, timeout:)
       result = server_for(command).health_check(timeout:)
-      result.status.success? && JSON.parse(result.stdout)["ok"] == true
+      result.status.success? && ReactEmailRails::RenderProtocol.compatible_response?(JSON.parse(result.stdout))
     rescue StandardError
       false
     end

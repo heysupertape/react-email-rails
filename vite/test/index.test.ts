@@ -1,7 +1,7 @@
 import React from "react"
 import { describe, expect, it } from "vitest"
 
-import { reactEmailRails } from "../src/index"
+import { RENDER_PROTOCOL_VERSION, VERSION, reactEmailRails } from "../src/index"
 import { type EmailRegistry, renderEmail, serve, toComponentName } from "../src/runtime"
 
 type EmailConfig = {
@@ -116,8 +116,16 @@ describe("serve", () => {
       .split("\n")
       .map((line) => JSON.parse(line))
     expect(responses).toHaveLength(3)
-    expect(responses[0]).toMatchObject({ ok: true })
+    expect(responses[0]).toMatchObject({
+      ok: true,
+      protocolVersion: RENDER_PROTOCOL_VERSION,
+      packageVersion: VERSION,
+    })
     expect(responses[1].html).toContain("Hi Ada")
+    expect(responses[1]).toMatchObject({
+      protocolVersion: RENDER_PROTOCOL_VERSION,
+      packageVersion: VERSION,
+    })
     expect(responses[2].html).toContain("Hi Grace")
   })
 })

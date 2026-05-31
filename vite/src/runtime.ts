@@ -1,6 +1,8 @@
 import { render, type Options as ReactEmailRenderOptions } from "@react-email/render"
 import React from "react"
 
+import { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"
+
 export type EmailModule = {
   default: React.ComponentType<Record<string, unknown>>
 }
@@ -21,6 +23,11 @@ export type HealthRequest = {
 export type RenderedEmail = {
   html: string
   text: string
+}
+
+type ProtocolMetadata = {
+  protocolVersion: number
+  packageVersion: string
 }
 
 export type EmailRenderOptions = {
@@ -57,14 +64,14 @@ export async function serve(registry: EmailRegistry): Promise<void> {
   }
 
   if (process.argv.includes("--health")) {
-    process.stdout.write(JSON.stringify({ ok: true }))
+    process.stdout.write(JSON.stringify(okResponse()))
     return
   }
 
   const write = isolateStdout()
   try {
     const request = JSON.parse(await readStdin()) as RenderRequest
-    write(JSON.stringify(await renderEmail(request, registry)))
+    write(JSON.stringify({ ...(await renderEmail(request, registry)), ...protocolMetadata() }))
   } catch (error) {
     process.stderr.write(error instanceof Error ? error.message : "React Email render failed")
     process.exitCode = 1
@@ -123,11 +130,11 @@ async function writePersistentResponse(
   try {
     const request = JSON.parse(line) as RenderRequest | HealthRequest
     if ("health" in request) {
-      write(`${JSON.stringify({ ok: true })}\n`)
+      write(`${JSON.stringify(okResponse())}\n`)
       return
     }
 
-    write(`${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)) })}\n`)
+    write(`${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)), ...protocolMetadata() })}\n`)
   } catch (error) {
     write(
       `${JSON.stringify({
@@ -135,5 +142,16 @@ async function writePersistentResponse(
         error: error instanceof Error ? error.message : "React Email render failed",
       })}\n`,
     )
+  }
+}
+
+function okResponse(): { ok: true } & ProtocolMetadata {
+  return { ok: true, ...protocolMetadata() }
+}
+
+function protocolMetadata(): ProtocolMetadata {
+  return {
+    protocolVersion: RENDER_PROTOCOL_VERSION,
+    packageVersion: VERSION,
   }
 }

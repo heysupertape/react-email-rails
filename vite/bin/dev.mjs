@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { createServer, isRunnableDevEnvironment, loadConfigFromFile } from "vite"
+import { RENDER_PROTOCOL_VERSION, VERSION } from "../dist/version.js"
 
 if (process.argv.includes("--health")) {
-  process.stdout.write(JSON.stringify({ ok: true }))
+  process.stdout.write(JSON.stringify({ ok: true, protocolVersion: RENDER_PROTOCOL_VERSION, packageVersion: VERSION }))
   process.exit(0)
 }
 

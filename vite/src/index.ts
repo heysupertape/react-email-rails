@@ -149,4 +149,5 @@ export type {
   EmailRenderOptions,
   RenderedEmail,
   RenderRequest,
-} from "./runtime"
+} from "./runtime.js"
+export { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"

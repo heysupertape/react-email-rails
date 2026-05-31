@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true",
   }
 
-  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*", "README.md", "CHANGELOG.md", "LICENSE.md"] }
+  spec.files = Dir.chdir(__dir__) { Dir["lib/**/*", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE.md", "SECURITY.md"] }
   spec.require_paths = ["lib"]
   spec.required_ruby_version = ">= 3.3"
 

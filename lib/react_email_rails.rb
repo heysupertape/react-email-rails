@@ -11,6 +11,7 @@ require("rails/railtie")
 module ReactEmailRails; end
 
 require_relative("react_email_rails/version")
+require_relative("react_email_rails/render_protocol")
 require_relative("react_email_rails/action_mailer")
 require_relative("react_email_rails/render_error")
 require_relative("react_email_rails/rendered_email")

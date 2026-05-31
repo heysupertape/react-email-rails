@@ -30,12 +30,15 @@ class ReactEmailRails::Configuration
 
   attr_accessor(
     :component_path_resolver,
-    :render_mode,
     :render_options,
-    :render_timeout,
     :transform_props,
     :on_render_error,
     :verify_render_on_boot,
+  )
+  attr_reader(
+    :render_mode,
+    :render_timeout,
+    :render_process_max_requests,
   )
 
   class << self
@@ -45,6 +48,7 @@ class ReactEmailRails::Configuration
         config.render_mode = :subprocess
         config.render_options = {}
         config.render_timeout = DEFAULT_RENDER_TIMEOUT
+        config.render_process_max_requests = DEFAULT_RENDER_PROCESS_MAX_REQUESTS
         config.transform_props = :lower_camel
         config.on_render_error = nil
         config.verify_render_on_boot = DEFAULT_VERIFY_RENDER_ON_BOOT
@@ -54,6 +58,28 @@ class ReactEmailRails::Configuration
 
   def verify_render_on_boot?
     verify_render_on_boot.respond_to?(:call) ? !!verify_render_on_boot.call : !!verify_render_on_boot
+  end
+
+  def render_mode=(value)
+    if (value.is_a?(Symbol) || value.is_a?(String)) && !RENDER_MODES.key?(value.to_sym)
+      raise(ArgumentError, "Unknown react-email-rails render mode: #{value.inspect}")
+    end
+
+    @render_mode = value
+  end
+
+  def render_timeout=(value)
+    raise(ArgumentError, "react-email-rails render_timeout must be positive") unless value.is_a?(Numeric) && value.positive?
+
+    @render_timeout = value
+  end
+
+  def render_process_max_requests=(value)
+    unless value.nil? || (value.is_a?(Integer) && value.positive?)
+      raise(ArgumentError, "react-email-rails render_process_max_requests must be a positive integer or nil")
+    end
+
+    @render_process_max_requests = value
   end
 
   def resolved_render_mode
@@ -85,10 +111,6 @@ class ReactEmailRails::Configuration
 
   def serialize_props(props)
     deep_transform_keys(props.as_json, key_transform)
-  end
-
-  def render_process_max_requests
-    DEFAULT_RENDER_PROCESS_MAX_REQUESTS
   end
 
   def key_transform

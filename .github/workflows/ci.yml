@@ -68,3 +68,5 @@ jobs:
         working-directory: vite
       - run: pnpm run ci
         working-directory: vite
+      - run: pnpm pack --dry-run
+        working-directory: vite
