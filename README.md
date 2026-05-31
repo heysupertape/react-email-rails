@@ -4,8 +4,8 @@ Build and send emails using React and Rails — a seamless integration between [
 
 ## Contents
 
-- [Why?](#why)
-- [How?](#how)
+- [Why](#why)
+- [How](#how)
 - [Status](#status)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
@@ -16,11 +16,11 @@ Build and send emails using React and Rails — a seamless integration between [
 - [Contributing](#contributing)
 - [License](#license)
 
-## Why?
+## Why
 
 Building HTML emails is painfully archaic. [React Email](https://react.email) is a collection of unstyled components for building emails with React, Tailwind, and TypeScript. This gem brings that power directly into your Rails app: write emails as React components and send them through Action Mailer.
 
-## How?
+## How
 
 **In development,** the gem renders components live through Vite's dev pipeline, so your emails get the same module resolution and transforms as the rest of your frontend.
 
@@ -152,7 +152,7 @@ That's it — it now renders and delivers like any other Action Mailer email.
 
 ## Usage
 
-Pass props with `react:` in your mailers. Each top-level key becomes a prop on the React component's default export.
+Pass data from your mailers and each top-level key becomes a prop on the React component's default export.
 
 ```ruby
 mail react: { foo: "bar" }, ...
