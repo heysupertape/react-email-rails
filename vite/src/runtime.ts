@@ -134,7 +134,9 @@ async function writePersistentResponse(
       return
     }
 
-    write(`${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)), ...protocolMetadata() })}\n`)
+    write(
+      `${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)), ...protocolMetadata() })}\n`,
+    )
   } catch (error) {
     write(
       `${JSON.stringify({
