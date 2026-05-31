@@ -8,10 +8,6 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     assert_equal(ReactEmailRails::RenderModes::Subprocess, config.resolved_render_mode)
   end
 
-  test("does not verify the render command on boot by default") do
-    assert_not(ReactEmailRails::Configuration.default.verify_render_on_boot?)
-  end
-
   test("defaults prop key transformation to lower camel case") do
     assert_equal(:lower_camel, ReactEmailRails::Configuration.default.transform_props)
   end
@@ -29,26 +25,6 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     error = assert_raises(ArgumentError) { config.render_mode = :unknown }
 
     assert_equal("Unknown react-email-rails render mode: :unknown", error.message)
-  end
-
-  test("verify_render_on_boot? evaluates a callable option") do
-    config = ReactEmailRails::Configuration.default
-    config.verify_render_on_boot = -> { true }
-
-    assert(config.verify_render_on_boot?)
-
-    config.verify_render_on_boot = -> { false }
-    assert_not(config.verify_render_on_boot?)
-  end
-
-  test("verify_render_on_boot? coerces a static option to a boolean") do
-    config = ReactEmailRails::Configuration.default
-
-    config.verify_render_on_boot = false
-    assert_not(config.verify_render_on_boot?)
-
-    config.verify_render_on_boot = "truthy"
-    assert(config.verify_render_on_boot?)
   end
 
   test("default prop serialization lower camelizes keys") do

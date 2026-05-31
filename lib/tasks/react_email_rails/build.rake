@@ -4,6 +4,9 @@ namespace(:react_email_rails) do
 
   desc("Remove the React Email Rails production bundle")
   task(clobber: :environment) { ReactEmailRails::Tasks.clobber }
+
+  desc("Verify the React Email Rails renderer is healthy (exits non-zero on failure)")
+  task(verify: :environment) { ReactEmailRails::Tasks.verify }
 end
 
 unless ENV["SKIP_REACT_EMAIL_RAILS_BUILD"]

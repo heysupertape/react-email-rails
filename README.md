@@ -308,7 +308,6 @@ If the defaults don't fit, override them in `config/initializers/react_email_rai
 | `render_timeout` | `10` seconds |
 | `render_process_max_requests` | `1_000` |
 | `on_render_error` | `nil` |
-| `verify_render_on_boot` | `false` |
 
 #### Prop Transformation
 
@@ -391,8 +390,6 @@ Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
-  next if event.payload[:exception]
-
   Rails.logger.info("[react-email-rails] Rendered #{event.payload[:component]} (Duration: #{event.duration.round}ms | Size: #{event.payload[:html_bytes]} bytes)")
 end
 ```
@@ -495,18 +492,23 @@ The Ruby gem and npm package must stay on the same version. The renderer include
 
 The build command preserves `emails.path`, `emails.extension`, `emails.ignore`, `standalone`, and email-only `vite` options.
 
-### Runtime Dependencies
+### Renderer Verification
 
-For runtime dependency tradeoffs, see [Standalone Builds](#standalone-builds).
+To confirm the renderer is ready before relying on it, run:
 
-### Boot Verification
+```sh
+bin/rails react_email_rails:verify
+```
 
-Boot verification is disabled by default. If you want the app to check the renderer during boot, scope it to the same processes that build or ship the bundle:
+It checks that the render command runs and that the npm package version matches the gem, then exits non-zero with an actionable message on failure. Wire it into your CI or release step to catch a missing bundle or version drift before a deploy ships — a renderer failure won't otherwise surface until the first email is sent.
+
+For programmatic checks (for example, a health endpoint), `ReactEmailRails.healthy?` returns a boolean. If you specifically want a check at boot, call it from your own initializer and scope it to the processes that send mail so others don't pay the cost:
 
 ```ruby
-ReactEmailRails.configure do |config|
-  config.render_mode = :persistent if Rails.env.production? && Sidekiq.server?
-  config.verify_render_on_boot = -> { Rails.env.production? && Sidekiq.server? }
+Rails.application.config.after_initialize do
+  if Rails.env.production? && Sidekiq.server? && !ReactEmailRails.healthy?
+    Rails.logger.error("[react-email-rails] renderer verification failed")
+  end
 end
 ```
 
