@@ -5,7 +5,7 @@ import { RENDER_PROTOCOL_VERSION, VERSION, reactEmailRails } from "../src/index"
 import { type EmailRegistry, renderEmail, serve, toComponentName } from "../src/runtime"
 
 type EmailConfig = {
-  builder: object
+  builder?: object
   environments: {
     email: {
       resolve?: { noExternal?: boolean }
@@ -213,6 +213,21 @@ describe("reactEmailRails plugin", () => {
     })
   })
 
+  it("keeps isolated Vite options behind an internal symbol", () => {
+    const emailPlugin = { name: "email-only" }
+    const plugin = reactEmailRails({
+      vite: { define: { __EMAIL__: JSON.stringify(true) }, plugins: [emailPlugin] },
+    })
+    const viteOptions = (plugin as unknown as Record<symbol, unknown>)[
+      Symbol.for("react-email-rails.vite")
+    ]
+
+    expect(viteOptions).toMatchObject({
+      define: { __EMAIL__: "true" },
+      plugins: [emailPlugin],
+    })
+  })
+
   it("ignores underscore-prefixed partials by default", () => {
     const plugin = reactEmailRails()
     const resolved = (plugin.resolveId as (id: string) => string | undefined)(
@@ -246,11 +261,11 @@ describe("reactEmailRails plugin", () => {
     expect(source).toContain('import.meta.glob("/app/javascript/emails/**/*{.tsx,.jsx}")')
   })
 
-  it("registers the email build environment and opts into building it", () => {
+  it("registers the email build environment for the dedicated renderer", () => {
     const plugin = reactEmailRails()
     const config = (plugin.config as () => EmailConfig)()
 
-    expect(config.builder).toEqual({})
+    expect(config.builder).toBeUndefined()
     expect(config.environments.email.build).toMatchObject({
       ssr: true,
       outDir: "tmp/react-email-rails",

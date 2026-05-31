@@ -1,5 +1,6 @@
 class ReactEmailRails::Configuration
   BUNDLE_PATH = "tmp/react-email-rails/emails.js"
+  BUILD_BIN = "node_modules/.bin/react-email-rails-build"
   DEV_RENDER_BIN = "node_modules/.bin/react-email-rails-dev"
 
   DEFAULT_RENDER_TIMEOUT = 10

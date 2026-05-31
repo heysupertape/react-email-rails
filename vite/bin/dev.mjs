@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { createServer, isRunnableDevEnvironment, loadConfigFromFile } from "vite"
+import { createServer, isRunnableDevEnvironment } from "vite"
+import { fail, isolatedViteConfig, loadReactEmailRailsConfig } from "./shared.mjs"
 import { RENDER_PROTOCOL_VERSION, VERSION } from "../dist/version.js"
 
 if (process.argv.includes("--health")) {
@@ -19,40 +20,31 @@ const logger = {
 }
 
 // Load only this plugin and aliases; host dev-server plugins have global side effects.
-const loaded = await loadConfigFromFile({ command: "serve", mode: "development" })
-const userConfig = loaded?.config ?? {}
-const emailPlugin = (userConfig.plugins ?? [])
-  .flat(Infinity)
-  .find((plugin) => plugin?.name === "react-email-rails")
-
-if (!emailPlugin) {
-  process.stderr.write("react-email-rails: reactEmailRails() plugin not found in the Vite config\n")
-  process.exit(1)
-}
+const { userConfig, plugin, vite } = await loadReactEmailRailsConfig({
+  command: "serve",
+  mode: "development",
+})
 
 // Forward config that affects how components resolve and compile (but not the
 // host's dev-server plugins, which have global side effects), so dev rendering
 // stays close to the production email bundle.
-const server = await createServer({
-  configFile: false,
-  resolve: userConfig.resolve,
-  define: userConfig.define,
-  css: userConfig.css,
-  esbuild: { jsx: "automatic" },
-  plugins: [emailPlugin],
-  server: { middlewareMode: true },
-  appType: "custom",
-  clearScreen: false,
-  customLogger: logger,
-})
+const server = await createServer(
+  isolatedViteConfig(userConfig, vite, {
+    configFile: false,
+    plugins: [plugin],
+    server: { middlewareMode: true },
+    appType: "custom",
+    clearScreen: false,
+    customLogger: logger,
+  }),
+)
 
 // Render through the same `email` environment the production build uses, so dev
 // and build resolve and compile components identically.
 const environment = server.environments.email
 if (!isRunnableDevEnvironment(environment)) {
   await server.close()
-  process.stderr.write("react-email-rails: the email environment is not runnable\n")
-  process.exit(1)
+  fail("react-email-rails: the email environment is not runnable")
 }
 
 try {

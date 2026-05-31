@@ -1,4 +1,4 @@
-import type { Plugin } from "vite"
+import type { Plugin, UserConfig } from "vite"
 
 export type EmailsOption =
   | string
@@ -11,6 +11,14 @@ export type EmailsOption =
 export type ReactEmailRailsOptions = {
   emails?: EmailsOption
   standalone?: boolean
+  vite?: ReactEmailRailsViteOptions
+}
+
+export type ReactEmailRailsViteOptions = Pick<
+  UserConfig,
+  "assetsInclude" | "css" | "define" | "esbuild" | "json" | "plugins" | "resolve"
+> & {
+  oxc?: unknown
 }
 
 type PluginMetadata = {
@@ -35,6 +43,7 @@ const RESOLVED_MAIN = `\0${VIRTUAL_MAIN}`
 // The dedicated build environment that emits the server-side email bundle.
 export const EMAIL_ENVIRONMENT = "email"
 const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
+const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 
@@ -98,13 +107,12 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
     },
 
     config() {
-      // Register a dedicated `email` build environment and opt the app into
-      // building all environments, so a plain `vite build` emits the email
-      // bundle alongside the client assets — no separate build step required.
+      // Register a dedicated `email` build environment. The official
+      // react-email-rails-build bin opts into building it with an isolated
+      // plugin stack so host app plugins cannot break email SSR builds.
       // The environment is a server consumer. Standalone builds inline Node
       // dependencies by default so Rails runtime images do not need node_modules.
       return {
-        builder: {},
         environments: {
           [EMAIL_ENVIRONMENT]: {
             ...(standalone ? { resolve: { noExternal: true } } : {}),
@@ -138,6 +146,9 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
     value: {
       ...metadata,
     },
+  })
+  Object.defineProperty(plugin, VITE_CONFIG_SYMBOL, {
+    value: options.vite ?? {},
   })
 
   return plugin

@@ -1,6 +1,6 @@
 {
   "name": "react-email-rails",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Build and send emails using React and Rails",
   "license": "MIT",
   "type": "module",
@@ -37,6 +37,7 @@
   },
   "types": "./dist/index.d.ts",
   "bin": {
+    "react-email-rails-build": "./bin/build.mjs",
     "react-email-rails-config": "./bin/config.mjs",
     "react-email-rails-dev": "./bin/dev.mjs"
   },

@@ -82,7 +82,7 @@ class ReactEmailRails::RenderModes::Subprocess
     return unless command_path == "node" && bundle_path.end_with?(ReactEmailRails::Configuration::BUNDLE_PATH)
     return if File.file?(bundle_path)
 
-    raise(render_error("email bundle not found at #{bundle_path.inspect}; run vite build before rendering React emails"))
+    raise(render_error("email bundle not found at #{bundle_path.inspect}; run react-email-rails-build before rendering React emails"))
   end
 
   def validate_response!(body)

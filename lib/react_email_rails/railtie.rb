@@ -5,6 +5,8 @@ class ReactEmailRails::Railtie < Rails::Railtie
     end
   end
 
+  rake_tasks { load(File.expand_path("../tasks/react_email_rails/build.rake", __dir__)) }
+
   config.after_initialize do
     if ReactEmailRails.configuration.verify_render_on_boot? && !ReactEmailRails.healthy?
       Rails.logger.error(

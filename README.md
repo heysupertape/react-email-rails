@@ -25,7 +25,7 @@ Building HTML emails is painfully archaic. [React Email](https://react.email) is
 
 **In development,** the gem renders components live through Vite's dev pipeline, so your emails get the same module resolution and transforms as the rest of your frontend.
 
-**In production,** Vite builds a server-side email bundle ahead of time. The plugin adds a dedicated `email` build environment, so your normal `vite build` emits the bundle alongside your client assets.
+**In production,** Rails builds a server-side email bundle during `assets:precompile`. The bundled rake task runs an isolated email-only Vite build, using `reactEmailRails()` in your app's Vite config for discovery and options.
 
 Delivery, headers, multipart parts, previews, queues, and callbacks all stay normal Action Mailer. If rendering fails, no email is sent and `ReactEmailRails::RenderError` is raised.
 
@@ -63,6 +63,13 @@ bin/rails generate react_email_rails:install
 ```
 
 This creates `config/initializers/react_email_rails.rb`, installs missing JavaScript dependencies when it can detect your package manager, adds `reactEmailRails()` to `vite.config.*`, and creates `app/javascript/emails`.
+
+The installed setup follows the normal Rails lifecycle:
+
+- `bin/rails generate react_email_rails:email ...` creates matching mailers and React components.
+- Development renders through Vite on demand.
+- `bin/rails assets:precompile` builds the production email bundle automatically.
+- `bin/rails react_email_rails:build` builds the bundle directly when CI or tests need it.
 
 ### Manual Install
 
@@ -393,9 +400,9 @@ end
 
 ### Vite Configuration
 
-Most apps only need the `reactEmailRails()` plugin from [Quick Start](#quick-start). The options below change where components are discovered and how the bundle handles dependencies.
+Most apps only need the `reactEmailRails()` plugin from [Quick Start](#quick-start). The options below change where components are discovered, how the bundle handles dependencies, and which email-only Vite transforms run in the isolated renderer.
 
-In development, the renderer loads the `reactEmailRails()` plugin, JSX support, and your `resolve`, `define`, and `css` config — but none of your other dev-server plugins.
+In development and production, the isolated renderer loads the `reactEmailRails()` plugin, JSX support, and component-facing Vite config such as `resolve`, `define`, `css`, `json`, `assetsInclude`, `esbuild`, and `oxc` — but none of your other app plugins. Forwarded config is only for compiling and resolving email components; server, preview, dependency optimization, and build output settings stay owned by React Email Rails.
 
 #### Plugin Options
 
@@ -405,6 +412,7 @@ In development, the renderer loads the `reactEmailRails()` plugin, JSX support, 
 | `emails.extension` | `[".tsx", ".jsx"]` | Component extension, or an array of extensions |
 | `emails.ignore` | `["**/_*", "**/_*/**"]` | Glob patterns ignored under `emails.path` |
 | `standalone` | `true` | Inline SSR dependencies with `ssr.noExternal: true` |
+| `vite` | `{}` | Extra email-only Vite config for compilation and resolution |
 
 Use a custom directory:
 
@@ -426,6 +434,28 @@ reactEmailRails({
 
 Component names come from the Vite directory layout (see [Component Names](#component-names)). To map mailer actions to a different layout, override `component_path_resolver` on the Ruby side rather than renaming in the plugin, so both halves stay in sync.
 
+#### Advanced: Email-Only Vite Plugins
+
+Most apps do not need extra email plugins. If email components need a transform that is not part of Vite's default pipeline, add that transform to the email renderer:
+
+```ts
+import mdx from "@mdx-js/rollup"
+import { defineConfig } from "vite"
+import { reactEmailRails } from "react-email-rails"
+
+export default defineConfig({
+  plugins: [
+    reactEmailRails({
+      vite: {
+        plugins: [mdx()],
+      },
+    }),
+  ],
+})
+```
+
+These `vite` options are used by `react-email-rails-dev` and `react-email-rails-build`. They are intentionally scoped to React Email. Only `assetsInclude`, `css`, `define`, `esbuild`, `json`, `oxc`, `plugins`, and `resolve` are accepted here; output settings such as `build.outDir` and `build.rollupOptions` are ignored so the Ruby renderer can always find the generated bundle.
+
 #### Standalone Builds
 
 By default the email bundle inlines React, `@react-email/render`, and other Node dependencies. That makes the bundle larger, but it works well for Rails deploys that build assets in one stage and run without `node_modules` in the final runtime image.
@@ -442,23 +472,29 @@ Externalized bundles are smaller and may build faster, but the renderer needs th
 
 ## Deployment
 
-For a standard Rails + Vite deploy, there is nothing extra to configure. Keep running your normal asset build and the email bundle is emitted alongside your client assets.
+For production deploys, run the normal Rails asset task:
 
-### Standard Vite Builds
+```sh
+bin/rails assets:precompile
+```
 
-The plugin registers a dedicated `email` [build environment](https://vite.dev/guide/api-environment), so a normal `vite build` writes `tmp/react-email-rails/emails.js`, which the bundled production renderer runs with Node. With [rails_vite](https://github.com/skryukov/rails_vite/), this already happens during `assets:precompile`.
+The `react_email_rails:build` task is hooked into `assets:precompile` automatically. It loads your Vite config to find `reactEmailRails()` and its options, then writes `tmp/react-email-rails/emails.js` with the isolated React Email pipeline.
 
-The bundle is required, not an optimization. If it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent. Make sure `vite build` runs anywhere that renders mail, the same as for the rest of your assets.
+You can run it directly when needed:
+
+```sh
+bin/rails react_email_rails:build
+```
+
+Production rendering runs that bundle with Node. Set `SKIP_REACT_EMAIL_RAILS_BUILD=1` to skip the automatic asset hook. Directly running `bin/rails react_email_rails:build` always attempts the build.
+
+The npm package, Vite, React, and `@react-email/render` must be available when Rails runs `assets:precompile`. This is the same stage where Rails apps normally install JavaScript dependencies and build frontend assets.
+
+The bundle is required, not an optimization. If it's missing, renders raise `ReactEmailRails::RenderError` and no mail is sent.
 
 The Ruby gem and npm package must stay on the same version. The renderer includes a small protocol/version handshake, so mismatched installs fail with an actionable `ReactEmailRails::RenderError` instead of silently returning malformed output.
 
-### Custom Vite Builds
-
-To emit the bundle without a dedicated command, the plugin opts your project into Vite's [whole-app build](https://vite.dev/guide/api-environment):
-
-- A plain `vite build` builds every configured environment in one pass. For a standard client-only app, that's just your client assets plus the `email` bundle.
-- If you've defined other Vite environments, such as a custom `ssr` build, they build in the same pass too.
-- If your Vite config defines a custom `builder.buildApp`, make sure it builds `builder.environments.email` alongside your other environments. Custom builders replace Vite's default whole-app build orchestration.
+The build command preserves `emails.path`, `emails.extension`, `emails.ignore`, `standalone`, and email-only `vite` options.
 
 ### Runtime Dependencies
 
@@ -470,8 +506,8 @@ Boot verification is disabled by default. If you want the app to check the rende
 
 ```ruby
 ReactEmailRails.configure do |config|
-  config.verify_render_on_boot = -> { Rails.env.production? && Sidekiq.server? }
   config.render_mode = :persistent if Rails.env.production? && Sidekiq.server?
+  config.verify_render_on_boot = -> { Rails.env.production? && Sidekiq.server? }
 end
 ```
 

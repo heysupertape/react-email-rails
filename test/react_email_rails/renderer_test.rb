@@ -189,7 +189,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     end
 
     assert_includes(error.message, "email bundle not found")
-    assert_includes(error.message, "vite build")
+    assert_includes(error.message, "react-email-rails-build")
   end
 
   test("raises actionable render error when the command is missing") do
