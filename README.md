@@ -1,3 +1,5 @@
+![React Email + Rails](react-email-rails.png)
+
 # React Email + Rails
 
 Build and send emails using React and Rails — a seamless integration between [React Email](https://react.email) and [Action Mailer](https://guides.rubyonrails.org/action_mailer_basics.html).
