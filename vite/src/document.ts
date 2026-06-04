@@ -15,10 +15,8 @@ export type DocumentRenderer = {
 // A document node type that rendered to nothing, with how many times it occurred.
 export type DroppedNode = { type: string; count: number }
 
-// Editor-bundled node types that render to null by design (theme/metadata/
-// structural — globalContent, previewText, ...). Derived from the editor's base
-// extensions so it tracks the installed version instead of a hardcoded list, and
-// is excluded from dropped-content warnings to avoid false positives.
+// Editor-bundled structural nodes render to null by design. Derive the list from
+// the installed editor package so warning filtering tracks version changes.
 const STRUCTURAL_NODE_TYPES: ReadonlySet<string> = new Set(
   resolveExtensions([StarterKit, EmailTheming])
     .filter((extension) => extension.type === "node" && !(extension instanceof EmailNode))
@@ -26,11 +24,8 @@ const STRUCTURAL_NODE_TYPES: ReadonlySet<string> = new Set(
 )
 
 // composeReactEmail renders a node as null when no extension matches its type or
-// the match is not an EmailNode (see @react-email/editor parseContent). Mirror
-// that predicate over the document — recursing only into rendered nodes, the same
-// way the serializer does — so warnings list exactly what was dropped. A type
-// missing from the schema throws earlier in nodeFromJSON, so this only catches
-// the silent case: an in-schema node with no EmailNode to render it.
+// the match is not an EmailNode. Mirror that predicate over the document so
+// warnings report the silent case: an in-schema node with no email renderer.
 function collectDroppedNodes(document: unknown, extensions: Extensions): DroppedNode[] {
   const byName = new Map<string, Extensions[number]>()
   for (const extension of extensions) byName.set(extension.name, extension)

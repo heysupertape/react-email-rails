@@ -37,7 +37,7 @@ module ReactEmailRails
     end
 
     def render(component:, props:, render_options: configuration.resolve_render_options)
-      payload = { component:, props: configuration.send(:serialize_props, props) }
+      payload = { component:, props: serialized_props(props) }
       payload[:renderOptions] = render_options if render_options.present?
 
       instrument(kind: "email", component:) do
@@ -55,7 +55,7 @@ module ReactEmailRails
         kind: "document",
         type:,
         document: document.as_json,
-        context: configuration.send(:serialize_props, context),
+        context: serialized_props(context),
         preview:,
       }
 
@@ -78,11 +78,15 @@ module ReactEmailRails
 
     private
 
-    def instrument(**payload)
-      ActiveSupport::Notifications.instrument("render.react-email-rails", **payload) do |event|
+    def serialized_props(value)
+      configuration.send(:serialize_props, value)
+    end
+
+    def instrument(**metadata)
+      ActiveSupport::Notifications.instrument("render.react-email-rails", **metadata) do |payload|
         yield.tap do |rendered|
-          event[:html_bytes] = rendered.html.bytesize
-          event[:warnings] = rendered.warnings if rendered.warnings.present?
+          payload[:html_bytes] = rendered.html.bytesize
+          payload[:warnings] = rendered.warnings if rendered.warnings.present?
         end
       end
     end

@@ -72,10 +72,18 @@ export async function renderEmail(
 }
 
 function isDocumentRequest(request: unknown): request is RenderDocumentRequest {
-  return (request as { kind?: unknown }).kind === "document"
+  return (
+    request !== null &&
+    typeof request === "object" &&
+    (request as { kind?: unknown }).kind === "document"
+  )
 }
 
-// Requests without a `kind` are component renders, so the email path is unchanged.
+function isHealthRequest(request: unknown): request is HealthRequest {
+  return request !== null && typeof request === "object" && "health" in request
+}
+
+// Requests without a document kind are component renders, preserving the email path.
 async function renderRequest(
   request: RenderRequest | RenderDocumentRequest,
   registry: EmailRegistry,
@@ -171,7 +179,7 @@ async function writePersistentResponse(
 ): Promise<void> {
   try {
     const request = JSON.parse(line) as RenderRequest | RenderDocumentRequest | HealthRequest
-    if ("health" in request) {
+    if (isHealthRequest(request)) {
       write(`${JSON.stringify(okResponse())}\n`)
       return
     }
