@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Add `ReactEmailRails.compose` for server-side rendering of `@react-email/editor` documents (Tiptap/ProseMirror JSON) to HTML and text, the server analog of the editor's client-side `composeReactEmail` export.
+- Add the `documents` Vite plugin option for discovering document renderers, parallel to `emails`. It is off by default; the editor packages stay out of the email render path and build graph unless it is enabled.
+- Add `@react-email/editor` and `@tiptap/core` as optional peer dependencies (only required when rendering documents).
+- Bump the render protocol to 2 (the renderer now accepts document requests). The Ruby gem and npm package must be upgraded together, as before.
+
 ## 0.1.3
 
 - Remove the `verify_render_on_boot` configuration option, which only logged on failure and duplicated the render-time `ReactEmailRails::RenderError`.

@@ -1,3 +1,4 @@
+require("json")
 require("test_helper")
 
 class ReactEmailRailsTest < ActiveSupport::TestCase
@@ -8,6 +9,28 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     RUBY,
     "-e",
     "require \"json\"; $stdin.read; $stdout.write(JSON.generate(html: \"<p>Hi</p>\", text: \"Hi\", #{RENDER_METADATA}))",
+  ].freeze
+
+  # Echoes the request payload back as the HTML body so tests can assert it.
+  ECHO_INPUT = [
+    RUBY,
+    "-e",
+    "require \"json\"; $stdout.write(JSON.generate(html: $stdin.read, text: \"\", #{RENDER_METADATA}))",
+  ].freeze
+
+  COMPOSE_PERSISTENT = [
+    RUBY,
+    "-e",
+    <<~RUBY,
+      require "json"
+      abort "missing persistent flag" unless ARGV.include?("--persistent")
+      while (line = $stdin.gets)
+        request = JSON.parse(line)
+        $stdout.puts(JSON.generate(ok: true, html: "<p>\#{request["type"]}</p>", text: request["kind"], #{RENDER_METADATA}))
+        $stdout.flush
+      end
+    RUBY
+    "--",
   ].freeze
 
   HEALTH_OK = [
@@ -39,10 +62,139 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     end
 
     payload = events.sole.payload
+    assert_equal("email", payload[:kind])
     assert_equal("users/welcome", payload[:component])
     assert_equal("<p>Hi</p>".bytesize, payload[:html_bytes])
   ensure
     ActiveSupport::Notifications.unsubscribe(subscriber)
+  end
+
+  test("render serializes props and camelizes keys before sending them") do
+    rendered = with_react_email_internals(render_command: ECHO_INPUT) do
+      ReactEmailRails.render(
+        component: "users/welcome",
+        props: {
+          account_name: "Ada",
+          nested_props: { owner_email: "ada@example.com", tags: [{ created_at: "today" }] },
+        },
+      )
+    end
+
+    assert_equal(
+      {
+        "component" => "users/welcome",
+        "props" => {
+          "accountName" => "Ada",
+          "nestedProps" => { "ownerEmail" => "ada@example.com", "tags" => [{ "createdAt" => "today" }] },
+        },
+      },
+      JSON.parse(rendered.html),
+    )
+  end
+
+  test("render can send props without camelizing keys") do
+    rendered = with_react_email_internals(render_command: ECHO_INPUT) do
+      with_react_email_config(transform_props: :none) do
+        ReactEmailRails.render(
+          component: "users/welcome",
+          props: { account_name: "Ada", nested_props: { owner_email: "ada@example.com" } },
+        )
+      end
+    end
+
+    assert_equal(
+      { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } },
+      JSON.parse(rendered.html).fetch("props"),
+    )
+  end
+
+  test("compose sends a document payload with the document verbatim and the context camelized") do
+    document = {
+      "type" => "doc",
+      "content" => [
+        { "type" => "globalContent", "attrs" => {} },
+        {
+          "type" => "custom_block",
+          "attrs" => { "image_url" => "https://example.com/logo.png" },
+          "content" => [{ "type" => "text", "text" => "Hi" }],
+        },
+      ],
+    }
+
+    rendered = with_react_email_internals(render_command: ECHO_INPUT) do
+      ReactEmailRails.compose(
+        type: "broadcast",
+        document:,
+        context: { brand_name: "Acme", nested_thing: { logo_url: "https://example.com/logo.png" } },
+        preview: "Inbox preview",
+      )
+    end
+
+    payload = JSON.parse(rendered.html)
+    assert_equal("document", payload.fetch("kind"))
+    assert_equal("broadcast", payload.fetch("type"))
+    assert_equal("Inbox preview", payload.fetch("preview"))
+    # Structural document keys (custom_block, image_url) are untouched...
+    assert_equal(document, payload.fetch("document"))
+    # ...while context keys are camelized like component props.
+    assert_equal(
+      { "brandName" => "Acme", "nestedThing" => { "logoUrl" => "https://example.com/logo.png" } },
+      payload.fetch("context"),
+    )
+  end
+
+  test("compose returns the rendered html and text") do
+    rendered = with_react_email_internals(render_command: RENDER_FIXED) do
+      ReactEmailRails.compose(type: "broadcast", document: { "type" => "doc" })
+    end
+
+    assert_equal("<p>Hi</p>", rendered.html)
+    assert_equal("Hi", rendered.text)
+  end
+
+  test("compose renders through the persistent render mode") do
+    rendered = with_react_email_internals(render_command: COMPOSE_PERSISTENT) do
+      with_react_email_config(render_mode: :persistent) do
+        ReactEmailRails.compose(type: "broadcast", document: { "type" => "doc" })
+      end
+    end
+
+    assert_equal("<p>broadcast</p>", rendered.html)
+    assert_equal("document", rendered.text)
+  ensure
+    ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
+  end
+
+  test("compose emits a render.react-email-rails notification with kind, type, and html size") do
+    events = []
+    subscriber = ActiveSupport::Notifications.subscribe("render.react-email-rails") { |event| events << event }
+
+    with_react_email_internals(render_command: RENDER_FIXED) do
+      ReactEmailRails.compose(type: "broadcast", document: { "type" => "doc" })
+    end
+
+    payload = events.sole.payload
+    assert_equal("document", payload[:kind])
+    assert_equal("broadcast", payload[:type])
+    assert_equal("<p>Hi</p>".bytesize, payload[:html_bytes])
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+  end
+
+  test("compose invokes on_render_error with the document type and re-raises on failure") do
+    reported = []
+
+    with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
+      with_react_email_config(on_render_error: ->(error, type:) { reported << [error, type] }) do
+        assert_raises(ReactEmailRails::RenderError) do
+          ReactEmailRails.compose(type: "broadcast", document: { "type" => "doc" })
+        end
+      end
+    end
+
+    error, type = reported.sole
+    assert_instance_of(ReactEmailRails::RenderError, error)
+    assert_equal("broadcast", type)
   end
 
   test("render invokes on_render_error and re-raises on failure") do

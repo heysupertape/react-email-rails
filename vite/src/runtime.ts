@@ -1,6 +1,9 @@
 import { render, type Options as ReactEmailRenderOptions } from "@react-email/render"
 import React from "react"
 
+// Type-only: erased at build, so runtime.js never references the editor module
+// or its peer dependencies. The email render path stays free of @react-email/editor.
+import type { DocumentRegistry, RenderDocumentRequest } from "./document.js"
 import { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"
 
 export type EmailModule = {
@@ -18,6 +21,13 @@ export type RenderRequest = {
 
 export type HealthRequest = {
   health: true
+}
+
+// Injected by the generated server module when documents are enabled, so `serve`
+// renders documents without importing the editor module itself.
+export type DocumentSupport = {
+  registry: DocumentRegistry
+  compose: (request: RenderDocumentRequest, registry: DocumentRegistry) => Promise<RenderedEmail>
 }
 
 export type RenderedEmail = {
@@ -57,9 +67,30 @@ export async function renderEmail(
   }
 }
 
-export async function serve(registry: EmailRegistry): Promise<void> {
+function isDocumentRequest(request: unknown): request is RenderDocumentRequest {
+  return (request as { kind?: unknown }).kind === "document"
+}
+
+// Requests without a `kind` are component renders, so the email path is unchanged.
+async function renderRequest(
+  request: RenderRequest | RenderDocumentRequest,
+  registry: EmailRegistry,
+  documents: DocumentSupport | null,
+): Promise<RenderedEmail> {
+  if (isDocumentRequest(request)) {
+    if (!documents) throw new Error("React email document rendering is not enabled")
+    return documents.compose(request, documents.registry)
+  }
+
+  return renderEmail(request, registry)
+}
+
+export async function serve(
+  registry: EmailRegistry,
+  documents: DocumentSupport | null = null,
+): Promise<void> {
   if (process.argv.includes("--persistent")) {
-    await servePersistent(registry, isolateStdout())
+    await servePersistent(registry, documents, isolateStdout())
     return
   }
 
@@ -70,8 +101,13 @@ export async function serve(registry: EmailRegistry): Promise<void> {
 
   const write = isolateStdout()
   try {
-    const request = JSON.parse(await readStdin()) as RenderRequest
-    write(JSON.stringify({ ...(await renderEmail(request, registry)), ...protocolMetadata() }))
+    const request = JSON.parse(await readStdin()) as RenderRequest | RenderDocumentRequest
+    write(
+      JSON.stringify({
+        ...(await renderRequest(request, registry, documents)),
+        ...protocolMetadata(),
+      }),
+    )
   } catch (error) {
     process.stderr.write(error instanceof Error ? error.message : "React Email render failed")
     process.exitCode = 1
@@ -103,6 +139,7 @@ function readStdin(): Promise<string> {
 
 async function servePersistent(
   registry: EmailRegistry,
+  documents: DocumentSupport | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   process.stdin.setEncoding("utf8")
@@ -116,7 +153,7 @@ async function servePersistent(
       const line = pending.slice(0, separator)
       pending = pending.slice(separator + 1)
 
-      if (line.trim()) await writePersistentResponse(line, registry, write)
+      if (line.trim()) await writePersistentResponse(line, registry, documents, write)
       separator = pending.indexOf("\n")
     }
   }
@@ -125,17 +162,18 @@ async function servePersistent(
 async function writePersistentResponse(
   line: string,
   registry: EmailRegistry,
+  documents: DocumentSupport | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   try {
-    const request = JSON.parse(line) as RenderRequest | HealthRequest
+    const request = JSON.parse(line) as RenderRequest | RenderDocumentRequest | HealthRequest
     if ("health" in request) {
       write(`${JSON.stringify(okResponse())}\n`)
       return
     }
 
     write(
-      `${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)), ...protocolMetadata() })}\n`,
+      `${JSON.stringify({ ok: true, ...(await renderRequest(request, registry, documents)), ...protocolMetadata() })}\n`,
     )
   } catch (error) {
     write(

@@ -8,10 +8,11 @@ class ReactEmailRails::RenderModes::Subprocess
     end
   end
 
-  def initialize(component:, props:, render_options: {})
-    @component = component
-    @props = props
-    @render_options = render_options
+  # Payload-agnostic transport: the caller builds and serializes the payload.
+  # `label` identifies the render in error messages (component name or document type).
+  def initialize(payload:, label:)
+    @payload = payload
+    @label = label
   end
 
   def render
@@ -20,7 +21,7 @@ class ReactEmailRails::RenderModes::Subprocess
 
   private
 
-  attr_reader(:component, :props, :render_options)
+  attr_reader(:payload, :label)
 
   def run
     result = capture(payload_json)
@@ -50,17 +51,6 @@ class ReactEmailRails::RenderModes::Subprocess
 
   def render_timeout
     ReactEmailRails.configuration.render_timeout
-  end
-
-  def payload
-    @payload ||= begin
-      payload = {
-        component:,
-        props: ReactEmailRails.configuration.send(:serialize_props, props),
-      }
-      payload[:renderOptions] = render_options if render_options.present?
-      payload
-    end
   end
 
   def payload_json
@@ -94,6 +84,6 @@ class ReactEmailRails::RenderModes::Subprocess
   end
 
   def render_error(message)
-    ReactEmailRails::RenderError.new("React Email render failed for #{component}: #{message}")
+    ReactEmailRails::RenderError.new("React Email render failed for #{label}: #{message}")
   end
 end
