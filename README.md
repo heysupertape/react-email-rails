@@ -362,14 +362,21 @@ export function buildExtensions(context) {
   return [StarterKit, EmailTheming]
 }
 
-// Prepend a branded header node that lives outside the stored document.
+// Inject a branded header after the persisted theme node, wherever it sits.
 export function transformDocument(document, context) {
   const header = {
     type: "heading",
     attrs: { level: 1 },
     content: [{ type: "text", text: context.brandName }],
   }
-  return { ...document, content: [document.content[0], header, ...document.content.slice(1)] }
+  // Find globalContent and insert after it, rather than assuming a position, so
+  // the theme node is preserved.
+  const themeIndex = document.content.findIndex((node) => node.type === "globalContent")
+  const at = themeIndex + 1
+  return {
+    ...document,
+    content: [...document.content.slice(0, at), header, ...document.content.slice(at)],
+  }
 }
 
 export function getPreview(context) {
@@ -404,6 +411,16 @@ It returns the same `RenderedEmail` (`html`/`text`) as `render`, runs through th
 **Keys:** `context` is key-transformed exactly like component props (so `brand_name` arrives as `brandName`, per [`transform_props`](#prop-transformation)). The **`document` is passed through verbatim** — its keys (`type`, `attrs`, `content`, `marks`, node names, `globalContent`) are structural and are never transformed.
 
 `render_options` does not apply to documents; `composeReactEmail` controls its own rendering.
+
+### Debugging Dropped Content
+
+The most common integration bug is an extension/document mismatch. `composeReactEmail` renders any node or mark whose extension is not in `buildExtensions` as nothing — there is no error, the content simply disappears. If rendered output is missing pieces of the document:
+
+1. Confirm `buildExtensions` returns the **same** extensions the document was authored with — the editor's `StarterKit` plus every custom node, mark, and plugin in use.
+2. Compare the node `type`s in the stored document JSON against that list. Any `type` (or mark) without a matching extension is dropped.
+3. If you reshape the document in `transformDocument`, confirm you preserved the `globalContent` theme node (see above).
+
+Because the document is untrusted, stored input, treat a mismatch as data or version skew: a document authored with an extension you later removed will silently lose those nodes. Pinning a document's renderer `type` to the extension set it was created with — and versioning that set — avoids drift.
 
 ## Configuration
 
@@ -488,7 +505,7 @@ end
 
 #### Error Reporting
 
-Use `on_render_error` to report failures before the exception is re-raised. Email renders pass the `component:`; document renders pass the document `type:`, so accept both (or `**`) if you handle each:
+Use `on_render_error` to report failures before the exception is re-raised. The callback receives the error and a `context` of `kind:` (`"email"` or `"document"`) plus the identifier — `component:` for emails, `type:` for documents. Accept `**context` so one handler covers both render kinds:
 
 ```ruby
 ReactEmailRails.configure do |config|

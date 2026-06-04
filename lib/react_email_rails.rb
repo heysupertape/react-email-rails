@@ -44,7 +44,7 @@ module ReactEmailRails
         configuration.resolved_render_mode.new(payload:, label: component).render
       end
     rescue ReactEmailRails::RenderError => e
-      configuration.on_render_error&.call(e, component:)
+      configuration.on_render_error&.call(e, kind: "email", component:)
       raise
     end
 
@@ -63,7 +63,7 @@ module ReactEmailRails
         configuration.resolved_render_mode.new(payload:, label: type).render
       end
     rescue ReactEmailRails::RenderError => e
-      configuration.on_render_error&.call(e, type:)
+      configuration.on_render_error&.call(e, kind: "document", type:)
       raise
     end
 

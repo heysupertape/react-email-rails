@@ -6,6 +6,7 @@
 - Add the `documents` Vite plugin option for discovering document renderers, parallel to `emails`. It is off by default; the editor packages stay out of the email render path and build graph unless it is enabled.
 - Add `@react-email/editor` and `@tiptap/core` as optional peer dependencies (only required when rendering documents).
 - Bump the render protocol to 2 (the renderer now accepts document requests). The Ruby gem and npm package must be upgraded together, as before.
+- **Breaking:** `on_render_error` callbacks now receive a uniform `(error, **context)` shape, where `context` carries `kind:` (`"email"`/`"document"`) and either `component:` (emails) or `type:` (documents). Update `->(error, component:) { ... }` callbacks to `->(error, **context) { ... }`.
 
 ## 0.1.3
 

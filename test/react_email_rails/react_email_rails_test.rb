@@ -181,28 +181,28 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     ActiveSupport::Notifications.unsubscribe(subscriber)
   end
 
-  test("compose invokes on_render_error with the document type and re-raises on failure") do
+  test("compose invokes on_render_error with a uniform context and re-raises on failure") do
     reported = []
 
     with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
-      with_react_email_config(on_render_error: ->(error, type:) { reported << [error, type] }) do
+      with_react_email_config(on_render_error: ->(error, **context) { reported << [error, context] }) do
         assert_raises(ReactEmailRails::RenderError) do
           ReactEmailRails.compose(type: "broadcast", document: { "type" => "doc" })
         end
       end
     end
 
-    error, type = reported.sole
+    error, context = reported.sole
     assert_instance_of(ReactEmailRails::RenderError, error)
-    assert_equal("broadcast", type)
+    assert_equal({ kind: "document", type: "broadcast" }, context)
   end
 
-  test("render invokes on_render_error and re-raises on failure") do
+  test("render invokes on_render_error with a uniform context and re-raises on failure") do
     reported = []
 
     with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
       with_react_email_config(
-        on_render_error: ->(error, component:) { reported << [error, component] },
+        on_render_error: ->(error, **context) { reported << [error, context] },
       ) do
         assert_raises(ReactEmailRails::RenderError) do
           ReactEmailRails.render(component: "users/welcome", props: {})
@@ -210,9 +210,9 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
       end
     end
 
-    error, component = reported.sole
+    error, context = reported.sole
     assert_instance_of(ReactEmailRails::RenderError, error)
-    assert_equal("users/welcome", component)
+    assert_equal({ kind: "email", component: "users/welcome" }, context)
   end
 
   test("healthy? returns true when the command reports ok") do
