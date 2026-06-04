@@ -414,13 +414,18 @@ It returns the same `RenderedEmail` (`html`/`text`) as `render`, runs through th
 
 ### Debugging Dropped Content
 
-The most common integration bug is an extension/document mismatch. `composeReactEmail` renders any node or mark whose extension is not in `buildExtensions` as nothing — there is no error, the content simply disappears. If rendered output is missing pieces of the document:
+The most common integration bug is an extension/document mismatch. A node whose type is **missing from `buildExtensions` entirely** raises `ReactEmailRails::RenderError` (it can't be parsed) — loud and safe. The quiet case is a node that *is* in the schema but whose extension does not render to email (a plain Tiptap node rather than an email one): `composeReactEmail` renders it as nothing, with no error.
 
-1. Confirm `buildExtensions` returns the **same** extensions the document was authored with — the editor's `StarterKit` plus every custom node, mark, and plugin in use.
-2. Compare the node `type`s in the stored document JSON against that list. Any `type` (or mark) without a matching extension is dropped.
-3. If you reshape the document in `transformDocument`, confirm you preserved the `globalContent` theme node (see above).
+`compose` reports those dropped node types so the silent case isn't silent. They appear both on the result as `rendered.warnings` and on the [`render.react-email-rails`](#instrumentation) instrumentation event as `payload[:warnings]` — an array of `{ type:, count: }`. The editor's own non-rendering nodes (the `globalContent` theme node and similar) are excluded, so a non-empty `warnings` means real content was lost. Subscribe to the event to alert on it — or refuse to send:
 
-Because the document is untrusted, stored input, treat a mismatch as data or version skew: a document authored with an extension you later removed will silently lose those nodes. Pinning a document's renderer `type` to the extension set it was created with — and versioning that set — avoids drift.
+```ruby
+ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
+  warnings = event.payload[:warnings]
+  raise "dropped #{warnings.sum { _1[:count] }} node(s): #{warnings.map { _1[:type] }.join(", ")}" if warnings
+end
+```
+
+If content is missing, confirm `buildExtensions` returns the **same** extensions the document was authored with — the editor's `StarterKit` plus every custom node and plugin in use — and, if you reshape the document in `transformDocument`, that you preserved the `globalContent` theme node. Treat a mismatch as data or version skew: pinning a document's renderer `type` to the extension set it was created with, and versioning that set, avoids drift.
 
 ## Configuration
 
@@ -517,7 +522,7 @@ end
 
 #### Instrumentation
 
-Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries a `kind` (`"email"` or `"document"`), the `component` name (email) or `type` (document), and, on success, the rendered HTML size in `html_bytes`:
+Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries a `kind` (`"email"` or `"document"`), the `component` name (email) or `type` (document), and, on success, the rendered HTML size in `html_bytes`. Document renders that drop content also include `warnings` (see [Debugging Dropped Content](#debugging-dropped-content)):
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|

@@ -29,7 +29,7 @@ class ReactEmailRails::RenderModes::Subprocess
 
     body = JSON.parse(result.stdout)
     validate_response!(body)
-    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s)
+    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s, warnings: warnings_from(body))
   rescue JSON::ParserError => e
     raise(render_error("render process returned invalid JSON: #{e.message}"))
   rescue KeyError => e
@@ -81,6 +81,13 @@ class ReactEmailRails::RenderModes::Subprocess
     raise(KeyError.new(key: "html")) unless body.key?("html")
     raise(render_error("render process returned an invalid response: html must be a string")) unless body["html"].is_a?(String)
     raise(render_error("render process returned an invalid response: text must be a string")) if body.key?("text") && !body["text"].is_a?(String)
+  end
+
+  def warnings_from(body)
+    warnings = body["warnings"]
+    return [] unless warnings.is_a?(Array)
+
+    warnings.filter_map { |warning| warning.transform_keys(&:to_sym) if warning.is_a?(Hash) }
   end
 
   def render_error(message)

@@ -80,7 +80,10 @@ module ReactEmailRails
 
     def instrument(**payload)
       ActiveSupport::Notifications.instrument("render.react-email-rails", **payload) do |event|
-        yield.tap { |rendered| event[:html_bytes] = rendered.html.bytesize }
+        yield.tap do |rendered|
+          event[:html_bytes] = rendered.html.bytesize
+          event[:warnings] = rendered.warnings if rendered.warnings.present?
+        end
       end
     end
   end

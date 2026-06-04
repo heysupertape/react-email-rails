@@ -26,11 +26,17 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
       abort "missing persistent flag" unless ARGV.include?("--persistent")
       while (line = $stdin.gets)
         request = JSON.parse(line)
-        $stdout.puts(JSON.generate(ok: true, html: "<p>\#{request["type"]}</p>", text: request["kind"], #{RENDER_METADATA}))
+        $stdout.puts(JSON.generate(ok: true, html: "<p>\#{request["type"]}</p>", text: request["kind"], warnings: [{ type: "embed", count: 1 }], #{RENDER_METADATA}))
         $stdout.flush
       end
     RUBY
     "--",
+  ].freeze
+
+  COMPOSE_WITH_WARNINGS = [
+    RUBY,
+    "-e",
+    "require \"json\"; $stdin.read; $stdout.write(JSON.generate(html: \"<p>Hi</p>\", text: \"Hi\", warnings: [{ type: \"customBlock\", count: 2 }], #{RENDER_METADATA}))",
   ].freeze
 
   HEALTH_OK = [
@@ -65,6 +71,7 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     assert_equal("email", payload[:kind])
     assert_equal("users/welcome", payload[:component])
     assert_equal("<p>Hi</p>".bytesize, payload[:html_bytes])
+    assert_nil(payload[:warnings])
   ensure
     ActiveSupport::Notifications.unsubscribe(subscriber)
   end
@@ -161,8 +168,23 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
 
     assert_equal("<p>broadcast</p>", rendered.html)
     assert_equal("document", rendered.text)
+    assert_equal([{ type: "embed", count: 1 }], rendered.warnings)
   ensure
     ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
+  end
+
+  test("compose surfaces dropped-node warnings on the result and in instrumentation") do
+    events = []
+    subscriber = ActiveSupport::Notifications.subscribe("render.react-email-rails") { |event| events << event }
+
+    rendered = with_react_email_internals(render_command: COMPOSE_WITH_WARNINGS) do
+      ReactEmailRails.compose(type: "broadcast", document: { "type" => "doc" })
+    end
+
+    assert_equal([{ type: "customBlock", count: 2 }], rendered.warnings)
+    assert_equal([{ type: "customBlock", count: 2 }], events.sole.payload[:warnings])
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
   end
 
   test("compose emits a render.react-email-rails notification with kind, type, and html size") do

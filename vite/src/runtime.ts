@@ -3,7 +3,7 @@ import React from "react"
 
 // Type-only: erased at build, so runtime.js never references the editor module
 // or its peer dependencies. The email render path stays free of @react-email/editor.
-import type { DocumentRegistry, RenderDocumentRequest } from "./document.js"
+import type { DocumentRegistry, DroppedNode, RenderDocumentRequest } from "./document.js"
 import { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"
 
 export type EmailModule = {
@@ -23,16 +23,20 @@ export type HealthRequest = {
   health: true
 }
 
+export type RenderedEmail = {
+  html: string
+  text: string
+}
+
+// A render result plus any non-fatal warnings (document nodes dropped because no
+// extension rendered them). Component renders never carry warnings.
+export type RenderResult = RenderedEmail & { warnings?: DroppedNode[] }
+
 // Injected by the generated server module when documents are enabled, so `serve`
 // renders documents without importing the editor module itself.
 export type DocumentSupport = {
   registry: DocumentRegistry
-  compose: (request: RenderDocumentRequest, registry: DocumentRegistry) => Promise<RenderedEmail>
-}
-
-export type RenderedEmail = {
-  html: string
-  text: string
+  compose: (request: RenderDocumentRequest, registry: DocumentRegistry) => Promise<RenderResult>
 }
 
 type ProtocolMetadata = {
@@ -76,7 +80,7 @@ async function renderRequest(
   request: RenderRequest | RenderDocumentRequest,
   registry: EmailRegistry,
   documents: DocumentSupport | null,
-): Promise<RenderedEmail> {
+): Promise<RenderResult> {
   if (isDocumentRequest(request)) {
     if (!documents) throw new Error("React email document rendering is not enabled")
     return documents.compose(request, documents.registry)

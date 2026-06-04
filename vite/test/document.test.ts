@@ -1,5 +1,6 @@
 import { StarterKit } from "@react-email/editor/extensions"
 import { EmailTheming } from "@react-email/editor/plugins"
+import { Node } from "@tiptap/core"
 import { describe, expect, it } from "vitest"
 
 import { composeDocument, type DocumentRegistry, type DocumentRenderer } from "../src/document"
@@ -149,5 +150,38 @@ describe("composeDocument", () => {
     expect(seen.build).toEqual({ brand: "Acme" })
     expect(seen.transform).toEqual({ brand: "Acme" })
     expect(seen.preview).toEqual({ brand: "Acme" })
+  })
+
+  it("reports no warnings when every node renders, ignoring the theme node", async () => {
+    const result = await composeDocument(request("broadcast"), { broadcast })
+
+    expect(result.warnings).toBeUndefined()
+  })
+
+  it("reports node types dropped because no extension renders them", async () => {
+    // A plain Tiptap node is in the schema (so nodeFromJSON succeeds) but is not
+    // an EmailNode, so the serializer renders it as null — the silent-drop case.
+    const customBlock = Node.create({ name: "customBlock", group: "block", content: "text*" })
+    const registry: DocumentRegistry = {
+      broadcast: { buildExtensions: () => [StarterKit, EmailTheming, customBlock] },
+    }
+    const document = {
+      type: "doc",
+      content: [
+        { type: "globalContent", attrs: {} },
+        { type: "customBlock", content: [{ type: "text", text: "dropped one" }] },
+        { type: "customBlock", content: [{ type: "text", text: "dropped two" }] },
+        { type: "paragraph", content: [{ type: "text", text: "kept" }] },
+      ],
+    }
+
+    const result = await composeDocument(
+      { kind: "document", type: "broadcast", document },
+      registry,
+    )
+
+    expect(result.warnings).toEqual([{ type: "customBlock", count: 2 }])
+    expect(result.html).not.toContain("dropped one")
+    expect(result.html).toContain("kept")
   })
 })
