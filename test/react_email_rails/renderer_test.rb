@@ -86,58 +86,41 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
   end
 
+  # Serialization is covered at the ReactEmailRails.render / .compose level.
+  def subprocess(component:, props: {})
+    ReactEmailRails::RenderModes::Subprocess.new(
+      payload: { component:, props: },
+      label: component,
+    )
+  end
+
   test("pipes the payload to the command and returns the rendered email") do
     rendered = with_react_email_internals(render_command: RENDER_FIXED) do
-      ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: { account_name: "Ada" }).render
+      subprocess(component: "users/welcome", props: { account_name: "Ada" }).render
     end
 
     assert_equal("<p>Hello</p>", rendered.html)
     assert_equal("Hello", rendered.text)
   end
 
-  test("sends component and transformed props as the payload") do
+  test("ships the constructed payload to the command verbatim") do
     rendered = with_react_email_internals(render_command: ECHO_INPUT) do
       ReactEmailRails::RenderModes::Subprocess.new(
-        component: "users/welcome",
-        props: {
-          account_name: "Ada",
-          nested_props: { owner_email: "ada@example.com", tags: [{ created_at: "today" }] },
-        },
+        payload: { component: "users/welcome", props: { "accountName" => "Ada" } },
+        label: "users/welcome",
       ).render
     end
 
     assert_equal(
-      {
-        "component" => "users/welcome",
-        "props" => {
-          "accountName" => "Ada",
-          "nestedProps" => { "ownerEmail" => "ada@example.com", "tags" => [{ "createdAt" => "today" }] },
-        },
-      },
+      { "component" => "users/welcome", "props" => { "accountName" => "Ada" } },
       JSON.parse(rendered.html),
-    )
-  end
-
-  test("can send serialized props without camelizing keys") do
-    rendered = with_react_email_internals(render_command: ECHO_INPUT) do
-      with_react_email_config(transform_props: :none) do
-        ReactEmailRails::RenderModes::Subprocess.new(
-          component: "users/welcome",
-          props: { account_name: "Ada", nested_props: { owner_email: "ada@example.com" } },
-        ).render
-      end
-    end
-
-    assert_equal(
-      { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } },
-      JSON.parse(rendered.html).fetch("props"),
     )
   end
 
   test("raises render error with render process stderr on non-zero exit") do
     error = assert_raises(ReactEmailRails::RenderError) do
       with_react_email_internals(render_command: [RUBY, "-e", '$stderr.write("component exploded"); exit 1']) do
-        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+        subprocess(component: "users/welcome").render
       end
     end
 
@@ -148,7 +131,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
   test("raises render error when the render process returns invalid JSON") do
     error = assert_raises(ReactEmailRails::RenderError) do
       with_react_email_internals(render_command: [RUBY, "-e", '$stdout.write("not json")']) do
-        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+        subprocess(component: "users/welcome").render
       end
     end
 
@@ -160,7 +143,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
       with_react_email_internals(
         render_command: [RUBY, "-e", 'require "json"; $stdout.write(JSON.generate(html: "<p>Hello</p>", text: "Hello", protocolVersion: 0, packageVersion: "0.0.0"))'],
       ) do
-        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+        subprocess(component: "users/welcome").render
       end
     end
 
@@ -172,7 +155,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
       with_react_email_internals(
         render_command: [RUBY, "-e", "require \"json\"; $stdout.write(JSON.generate(text: \"Hello\", #{RENDER_METADATA}))"],
       ) do
-        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+        subprocess(component: "users/welcome").render
       end
     end
 
@@ -184,7 +167,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
 
     error = assert_raises(ReactEmailRails::RenderError) do
       with_react_email_internals(render_command: ["node", missing_bundle]) do
-        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+        subprocess(component: "users/welcome").render
       end
     end
 
@@ -195,7 +178,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
   test("raises actionable render error when the command is missing") do
     error = assert_raises(ReactEmailRails::RenderError) do
       with_react_email_internals(render_command: ["react-email-renderer-does-not-exist"]) do
-        ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+        subprocess(component: "users/welcome").render
       end
     end
 
@@ -206,7 +189,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     error = assert_raises(ReactEmailRails::RenderError) do
       with_react_email_internals(render_command: [RUBY, "-e", "sleep 5"]) do
         with_react_email_config(render_timeout: 0.2) do
-          ReactEmailRails::RenderModes::Subprocess.new(component: "users/welcome", props: {}).render
+          subprocess(component: "users/welcome").render
         end
       end
     end

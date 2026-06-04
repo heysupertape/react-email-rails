@@ -10,6 +10,9 @@ export type EmailsOption =
 
 export type ReactEmailRailsOptions = {
   emails?: EmailsOption
+  // Editor document renderers, discovered like emails. Off by default; pass `true`
+  // to enable with defaults, or a path/options object to customize discovery.
+  documents?: EmailsOption | boolean
   standalone?: boolean
   vite?: ReactEmailRailsViteOptions
 }
@@ -21,19 +24,33 @@ export type ReactEmailRailsViteOptions = Pick<
   oxc?: unknown
 }
 
+type SourceMetadata = {
+  path: string
+  extensions: string[]
+  ignore: string[]
+}
+
 type PluginMetadata = {
-  emails: {
-    path: string
-    extensions: string[]
-    ignore: string[]
-  }
+  emails: SourceMetadata
+  documents?: SourceMetadata
   standalone: boolean
   outDir: string
   bundleFile: string
 }
 
+type Source = {
+  path: string
+  extensions: string[]
+  ignore: string[]
+  root: string
+  globArg: string
+}
+
 const DEFAULT_IGNORE = ["**/_*", "**/_*/**"]
-const DEFAULT_EXTENSIONS = [".tsx", ".jsx"]
+const DEFAULT_EMAIL_PATH = "app/javascript/emails"
+const DEFAULT_EMAIL_EXTENSIONS = [".tsx", ".jsx"]
+const DEFAULT_DOCUMENT_PATH = "app/javascript/documents"
+const DEFAULT_DOCUMENT_EXTENSIONS = [".ts", ".tsx"]
 
 const VIRTUAL_SERVER = "virtual:react-email-rails/server"
 const VIRTUAL_MAIN = "virtual:react-email-rails/main"
@@ -48,16 +65,19 @@ const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 
-export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
-  const emails =
-    typeof options.emails === "string" ? { path: options.emails } : (options.emails ?? {})
-  const path = (emails.path ?? "app/javascript/emails").replace(/^\/|\/$/g, "")
+function normalizeSource(
+  option: EmailsOption | undefined,
+  defaultPath: string,
+  defaultExtensions: string[],
+): Source {
+  const source = typeof option === "string" ? { path: option } : (option ?? {})
+  const path = (source.path ?? defaultPath).replace(/^\/|\/$/g, "")
   const rawExtensions =
-    emails.extension === undefined
-      ? DEFAULT_EXTENSIONS
-      : Array.isArray(emails.extension)
-        ? emails.extension
-        : [emails.extension]
+    source.extension === undefined
+      ? defaultExtensions
+      : Array.isArray(source.extension)
+        ? source.extension
+        : [source.extension]
   const extensions = rawExtensions
     .map((extension) => (extension.startsWith(".") ? extension : `.${extension}`))
     .map((extension, index) => ({ extension, index }))
@@ -65,19 +85,33 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       (left, right) => right.extension.length - left.extension.length || left.index - right.index,
     )
     .map(({ extension }) => extension)
-  const standalone = options.standalone ?? true
 
   const root = `/${path}/`
   const pattern =
     extensions.length === 1 ? `${root}**/*${extensions[0]}` : `${root}**/*{${extensions.join(",")}}`
   const ignore =
-    emails.ignore === undefined
+    source.ignore === undefined
       ? DEFAULT_IGNORE
-      : Array.isArray(emails.ignore)
-        ? emails.ignore
-        : [emails.ignore]
+      : Array.isArray(source.ignore)
+        ? source.ignore
+        : [source.ignore]
   const globPatterns = [pattern, ...ignore.map((glob) => `!${root}${glob}`)]
   const globArg = JSON.stringify(globPatterns.length === 1 ? globPatterns[0] : globPatterns)
+
+  return { path, extensions, ignore, root, globArg }
+}
+
+export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
+  const emailSource = normalizeSource(options.emails, DEFAULT_EMAIL_PATH, DEFAULT_EMAIL_EXTENSIONS)
+  const documentSource =
+    options.documents === undefined || options.documents === false
+      ? null
+      : normalizeSource(
+          options.documents === true ? undefined : options.documents,
+          DEFAULT_DOCUMENT_PATH,
+          DEFAULT_DOCUMENT_EXTENSIONS,
+        )
+  const standalone = options.standalone ?? true
 
   const plugin: Plugin = {
     name: "react-email-rails",
@@ -94,17 +128,38 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       filter: { id: VIRTUAL_MODULE_PATTERN },
       handler(id) {
         if (id === RESOLVED_SERVER) {
-          return [
-            `import { serve, toComponentName } from "react-email-rails/runtime"`,
-            `const modules = import.meta.glob(${globArg})`,
-            `const extensions = ${JSON.stringify(extensions)}`,
+          const lines = [`import { serve, toComponentName } from "react-email-rails/runtime"`]
+
+          // Imported only here, so the editor stays out of the email build graph when off.
+          if (documentSource)
+            lines.push(`import { composeDocument } from "react-email-rails/document"`)
+
+          lines.push(
+            `const modules = import.meta.glob(${emailSource.globArg})`,
+            `const extensions = ${JSON.stringify(emailSource.extensions)}`,
             `const registry = Object.create(null)`,
             `for (const path in modules) {`,
             `  const extension = extensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
-            `  registry[toComponentName(path, ${JSON.stringify(root)}, extension)] = modules[path]`,
+            `  registry[toComponentName(path, ${JSON.stringify(emailSource.root)}, extension)] = modules[path]`,
             `}`,
-            `export const run = () => serve(registry)`,
-          ].join("\n")
+          )
+
+          if (documentSource) {
+            lines.push(
+              `const documentModules = import.meta.glob(${documentSource.globArg})`,
+              `const documentExtensions = ${JSON.stringify(documentSource.extensions)}`,
+              `const documentRegistry = Object.create(null)`,
+              `for (const path in documentModules) {`,
+              `  const extension = documentExtensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
+              `  documentRegistry[toComponentName(path, ${JSON.stringify(documentSource.root)}, extension)] = documentModules[path]`,
+              `}`,
+              `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument })`,
+            )
+          } else {
+            lines.push(`export const run = () => serve(registry)`)
+          }
+
+          return lines.join("\n")
         }
 
         if (id === RESOLVED_MAIN) {
@@ -142,10 +197,17 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
 
   const metadata: PluginMetadata = {
     emails: {
-      path,
-      extensions,
-      ignore,
+      path: emailSource.path,
+      extensions: emailSource.extensions,
+      ignore: emailSource.ignore,
     },
+    ...(documentSource && {
+      documents: {
+        path: documentSource.path,
+        extensions: documentSource.extensions,
+        ignore: documentSource.ignore,
+      },
+    }),
     standalone,
     outDir: OUT_DIR,
     bundleFile: BUNDLE_FILE,
@@ -169,5 +231,6 @@ export type {
   EmailRenderOptions,
   RenderedEmail,
   RenderRequest,
+  RenderResult,
 } from "./runtime.js"
 export { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"

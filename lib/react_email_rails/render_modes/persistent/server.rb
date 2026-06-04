@@ -80,6 +80,7 @@ class ReactEmailRails::RenderModes::Persistent::Server
       }.tap do |body|
         body[:html] = response["html"] if response.key?("html")
         body[:text] = response["text"] if response.key?("text")
+        body[:warnings] = response["warnings"] if response.key?("warnings")
       end,
     ))
   rescue JSON::ParserError => e

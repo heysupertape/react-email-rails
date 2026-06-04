@@ -8,10 +8,11 @@ class ReactEmailRails::RenderModes::Subprocess
     end
   end
 
-  def initialize(component:, props:, render_options: {})
-    @component = component
-    @props = props
-    @render_options = render_options
+  # Payload-agnostic transport: the caller builds and serializes the payload.
+  # `label` identifies the render in error messages (component name or document type).
+  def initialize(payload:, label:)
+    @payload = payload
+    @label = label
   end
 
   def render
@@ -20,7 +21,7 @@ class ReactEmailRails::RenderModes::Subprocess
 
   private
 
-  attr_reader(:component, :props, :render_options)
+  attr_reader(:payload, :label)
 
   def run
     result = capture(payload_json)
@@ -28,7 +29,7 @@ class ReactEmailRails::RenderModes::Subprocess
 
     body = JSON.parse(result.stdout)
     validate_response!(body)
-    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s)
+    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s, warnings: warnings_from(body))
   rescue JSON::ParserError => e
     raise(render_error("render process returned invalid JSON: #{e.message}"))
   rescue KeyError => e
@@ -50,17 +51,6 @@ class ReactEmailRails::RenderModes::Subprocess
 
   def render_timeout
     ReactEmailRails.configuration.render_timeout
-  end
-
-  def payload
-    @payload ||= begin
-      payload = {
-        component:,
-        props: ReactEmailRails.configuration.send(:serialize_props, props),
-      }
-      payload[:renderOptions] = render_options if render_options.present?
-      payload
-    end
   end
 
   def payload_json
@@ -93,7 +83,14 @@ class ReactEmailRails::RenderModes::Subprocess
     raise(render_error("render process returned an invalid response: text must be a string")) if body.key?("text") && !body["text"].is_a?(String)
   end
 
+  def warnings_from(body)
+    warnings = body["warnings"]
+    return [] unless warnings.is_a?(Array)
+
+    warnings.filter_map { |warning| warning.transform_keys(&:to_sym) if warning.is_a?(Hash) }
+  end
+
   def render_error(message)
-    ReactEmailRails::RenderError.new("React Email render failed for #{component}: #{message}")
+    ReactEmailRails::RenderError.new("React Email render failed for #{label}: #{message}")
   end
 end

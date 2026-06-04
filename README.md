@@ -12,6 +12,7 @@ Build and send emails using React and Rails — a seamless integration between [
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+- [Editor](#editor)
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 - [Development](#development)
@@ -43,6 +44,7 @@ React Email Rails automatically renders both HTML and plain-text versions from t
 - Vite 7 or 8
 - React 18 or 19
 - `@react-email/render` 2.x
+- For [rendering editor documents](#editor) (optional): `@react-email/editor` 1.5+ and `@tiptap/core` 3.x
 
 > We recommend [rails_vite](https://github.com/skryukov/rails_vite/) for Vite with Rails.
 
@@ -293,6 +295,138 @@ export default function Welcome() {
 
 See [Component Names](#component-names) for how shared `_` files are handled.
 
+## Editor
+
+Alongside named components, the gem can render a [@react-email/editor](https://react.email/docs/editor) document — the Tiptap/ProseMirror JSON a visual editor produces — to HTML and text on the server.
+
+React Email exposes [composeReactEmail](https://react.email/docs/editor/api-reference/compose-react-email) for this, but only from the browser, with a live editor instance from the export panel. `ReactEmailRails.compose` is the server analog: it rebuilds what `composeReactEmail` needs headlessly (no DOM, no live editor) from the stored document and the extensions you declare, then calls the same function. So `compose` is to the editor what `render` is to a component.
+
+This is opt-in. The editor packages are optional peer dependencies and stay out of the email render path until you enable it.
+
+### Setup
+
+Install the editor packages:
+
+```sh
+npm i @react-email/editor @tiptap/core
+```
+
+Enable the `documents` option in your Vite config:
+
+```ts
+// vite.config.ts
+
+import { defineConfig } from "vite"
+import { reactEmailRails } from "react-email-rails"
+
+export default defineConfig({
+  plugins: [reactEmailRails({ documents: true })],
+})
+```
+
+`documents: true` enables it with defaults (`app/javascript/documents`, `.ts`/`.tsx` extensions). Like `emails`, it also accepts a directory string or `{ path, extension, ignore }`. See [Plugin Options](#plugin-options).
+
+### Document Renderers
+
+A document doesn't carry the editor configuration it was authored with, so a headless renderer has to be told which extensions a given document needs. Each file under the documents directory is a **document renderer** — the editor-side analog of an email component — and its name is resolved from the directory layout just like [component names](#component-names) (so `broadcast` maps to `app/javascript/documents/broadcast.ts`).
+
+```ts
+// app/javascript/documents/broadcast.ts
+
+import { StarterKit } from "@react-email/editor/extensions"
+import { EmailTheming } from "@react-email/editor/plugins"
+
+// Required: the Tiptap extensions the document was authored with.
+export function buildExtensions() {
+  return [StarterKit, EmailTheming]
+}
+```
+
+A renderer can export two optional hooks:
+
+| Export | Required | Description |
+|--------|----------|-------------|
+| `buildExtensions(context)` | Yes | Returns the Tiptap extension list for the document. |
+| `transformDocument(document, context)` | No | Returns a rewritten document before rendering — for example, to inject header/footer nodes that aren't persisted in the stored document. |
+| `getPreview(context)` | No | Returns inbox preview text when the `compose` call doesn't pass one. |
+
+`context` is the optional data you pass to `compose` (see below). Use it to vary extensions, transforms, or preview text per render.
+
+```ts
+// app/javascript/documents/broadcast.ts
+
+import { StarterKit } from "@react-email/editor/extensions"
+import { EmailTheming } from "@react-email/editor/plugins"
+
+export function buildExtensions(context) {
+  return [StarterKit, EmailTheming]
+}
+
+// Inject a branded header after the persisted theme node, wherever it sits.
+export function transformDocument(document, context) {
+  const header = {
+    type: "heading",
+    attrs: { level: 1 },
+    content: [{ type: "text", text: context.brandName }],
+  }
+  // Find globalContent and insert after it, rather than assuming a position, so
+  // the theme node is preserved.
+  const themeIndex = document.content.findIndex((node) => node.type === "globalContent")
+  const at = themeIndex + 1
+  return {
+    ...document,
+    content: [...document.content.slice(0, at), header, ...document.content.slice(at)],
+  }
+}
+
+export function getPreview(context) {
+  return context.previewText
+}
+```
+
+> **Match the extensions to the document.** `composeReactEmail` renders any node whose extension isn't registered as `null`, so a document that uses a node your `buildExtensions` omits will silently drop that content. Return the same extension list the document was authored with.
+
+> **Keep the theme node.** The editor persists its theme in a `globalContent` node and `EmailTheming` reads it back when rendering. If you reshape the document in `transformDocument`, preserve that node.
+
+### Composing a Document
+
+Call `ReactEmailRails.compose` with the renderer `type`, the stored document, and optional `context`/`preview`:
+
+```ruby
+broadcast = Broadcast.find(params[:id])
+
+rendered = ReactEmailRails.compose(
+  type: "broadcast",
+  document: broadcast.body,          # Tiptap JSON, e.g. a jsonb column
+  context: { brand_name: "Acme", preview_text: broadcast.subject },
+  preview: broadcast.subject,        # optional; falls back to getPreview(context)
+)
+
+rendered.html # => "<!DOCTYPE html>..."
+rendered.text # => "ACME\n\n..."
+```
+
+It returns the same `RenderedEmail` (`html`/`text`) as `render`, runs through the same [render modes](#render-modes), and raises `ReactEmailRails::RenderError` on failure. Documents don't go through Action Mailer — broadcasts and the like usually have their own delivery path — so deliver `rendered.html`/`rendered.text` however your app sends mail.
+
+**Keys:** `context` is key-transformed exactly like component props (so `brand_name` arrives as `brandName`, per [`transform_props`](#prop-transformation)). The **`document` is passed through verbatim** — its keys (`type`, `attrs`, `content`, `marks`, node names, `globalContent`) are structural and are never transformed.
+
+`render_options` does not apply to documents; `composeReactEmail` controls its own rendering.
+
+### Debugging Dropped Content
+
+The most common integration bug is an extension/document mismatch. A node whose type is **missing from `buildExtensions` entirely** raises `ReactEmailRails::RenderError` (it can't be parsed) — loud and safe. The quiet case is a node that *is* in the schema but whose extension does not render to email (a plain Tiptap node rather than an email one): `composeReactEmail` renders it as nothing, with no error.
+
+`compose` reports those dropped node types so the silent case isn't silent. They appear both on the result as `rendered.warnings` and on the [`render.react-email-rails`](#instrumentation) instrumentation event as `payload[:warnings]` — an array of `{ type:, count: }`. The editor's own non-rendering nodes (the `globalContent` theme node and similar) are excluded, so a non-empty `warnings` means real content was lost. Subscribe to the event to alert on it — or refuse to send:
+
+```ruby
+ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
+  warnings = event.payload[:warnings]
+  raise "dropped #{warnings.sum { _1[:count] }} node(s): #{warnings.map { _1[:type] }.join(", ")}" if warnings
+end
+```
+
+If content is missing, confirm `buildExtensions` returns the **same** extensions the document was authored with — the editor's `StarterKit` plus every custom node and plugin in use — and, if you reshape the document in `transformDocument`, that you preserved the `globalContent` theme node. Treat a mismatch as data or version skew: pinning a document's renderer `type` to the extension set it was created with, and versioning that set, avoids drift.
+
 ## Configuration
 
 Configuration is handled primarily on the Rails side, though there are some Vite options to be aware of.
@@ -376,19 +510,19 @@ end
 
 #### Error Reporting
 
-Use `on_render_error` to report failures before the exception is re-raised:
+Use `on_render_error` to report failures before the exception is re-raised. The callback receives the error and a `context` of `kind:` (`"email"` or `"document"`) plus the identifier — `component:` for emails, `type:` for documents. Accept `**context` so one handler covers both render kinds:
 
 ```ruby
 ReactEmailRails.configure do |config|
-  config.on_render_error = ->(error, component:) {
-    Rails.error.report(error, context: { component: })
+  config.on_render_error = ->(error, **context) {
+    Rails.error.report(error, context:)
   }
 end
 ```
 
 #### Instrumentation
 
-Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries the `component` name and, on success, the rendered HTML size in `html_bytes`:
+Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries a `kind` (`"email"` or `"document"`), the `component` name (email) or `type` (document), and, on success, the rendered HTML size in `html_bytes`. Document renders that drop content also include `warnings` (see [Debugging Dropped Content](#debugging-dropped-content)):
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
@@ -409,6 +543,10 @@ In development and production, the isolated renderer loads the `reactEmailRails(
 | `emails.path` | `"app/javascript/emails"` | Directory containing email components |
 | `emails.extension` | `[".tsx", ".jsx"]` | Component extension, or an array of extensions |
 | `emails.ignore` | `["**/_*", "**/_*/**"]` | Glob patterns ignored under `emails.path` |
+| `documents` | `false` (off) | Enable [editor document rendering](#editor). `true`, a path string, or `{ path, extension, ignore }` |
+| `documents.path` | `"app/javascript/documents"` | Directory containing document renderers |
+| `documents.extension` | `[".ts", ".tsx"]` | Renderer extension, or an array of extensions |
+| `documents.ignore` | `["**/_*", "**/_*/**"]` | Glob patterns ignored under `documents.path` |
 | `standalone` | `true` | Inline production email bundle dependencies |
 | `vite` | `{}` | Extra email-only Vite config for compilation and resolution |
 

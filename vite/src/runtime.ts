@@ -25,6 +25,28 @@ export type RenderedEmail = {
   text: string
 }
 
+export type RenderDocumentRequest = {
+  kind: "document"
+  type: string
+  document: unknown
+  context?: unknown
+  preview?: string | null
+}
+
+// A document node type that rendered to nothing, with how many times it occurred.
+export type DroppedNode = { type: string; count: number }
+
+// A render result plus any non-fatal warnings (document nodes dropped because no
+// extension rendered them). Component renders never carry warnings.
+export type RenderResult = RenderedEmail & { warnings?: DroppedNode[] }
+
+// Injected by the generated server module when documents are enabled, so `serve`
+// renders documents without importing the editor module or its peer types.
+export type DocumentSupport<Registry = unknown> = {
+  registry: Registry
+  compose: (request: RenderDocumentRequest, registry: Registry) => Promise<RenderResult>
+}
+
 type ProtocolMetadata = {
   protocolVersion: number
   packageVersion: string
@@ -57,9 +79,38 @@ export async function renderEmail(
   }
 }
 
-export async function serve(registry: EmailRegistry): Promise<void> {
+function isDocumentRequest(request: unknown): request is RenderDocumentRequest {
+  return (
+    request !== null &&
+    typeof request === "object" &&
+    (request as { kind?: unknown }).kind === "document"
+  )
+}
+
+function isHealthRequest(request: unknown): request is HealthRequest {
+  return request !== null && typeof request === "object" && "health" in request
+}
+
+// Requests without a document kind are component renders, preserving the email path.
+async function renderRequest<Registry>(
+  request: RenderRequest | RenderDocumentRequest,
+  registry: EmailRegistry,
+  documents: DocumentSupport<Registry> | null,
+): Promise<RenderResult> {
+  if (isDocumentRequest(request)) {
+    if (!documents) throw new Error("React email document rendering is not enabled")
+    return documents.compose(request, documents.registry)
+  }
+
+  return renderEmail(request, registry)
+}
+
+export async function serve<Registry = unknown>(
+  registry: EmailRegistry,
+  documents: DocumentSupport<Registry> | null = null,
+): Promise<void> {
   if (process.argv.includes("--persistent")) {
-    await servePersistent(registry, isolateStdout())
+    await servePersistent(registry, documents, isolateStdout())
     return
   }
 
@@ -70,8 +121,13 @@ export async function serve(registry: EmailRegistry): Promise<void> {
 
   const write = isolateStdout()
   try {
-    const request = JSON.parse(await readStdin()) as RenderRequest
-    write(JSON.stringify({ ...(await renderEmail(request, registry)), ...protocolMetadata() }))
+    const request = JSON.parse(await readStdin()) as RenderRequest | RenderDocumentRequest
+    write(
+      JSON.stringify({
+        ...(await renderRequest(request, registry, documents)),
+        ...protocolMetadata(),
+      }),
+    )
   } catch (error) {
     process.stderr.write(error instanceof Error ? error.message : "React Email render failed")
     process.exitCode = 1
@@ -101,8 +157,9 @@ function readStdin(): Promise<string> {
   })
 }
 
-async function servePersistent(
+async function servePersistent<Registry>(
   registry: EmailRegistry,
+  documents: DocumentSupport<Registry> | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   process.stdin.setEncoding("utf8")
@@ -116,26 +173,27 @@ async function servePersistent(
       const line = pending.slice(0, separator)
       pending = pending.slice(separator + 1)
 
-      if (line.trim()) await writePersistentResponse(line, registry, write)
+      if (line.trim()) await writePersistentResponse(line, registry, documents, write)
       separator = pending.indexOf("\n")
     }
   }
 }
 
-async function writePersistentResponse(
+async function writePersistentResponse<Registry>(
   line: string,
   registry: EmailRegistry,
+  documents: DocumentSupport<Registry> | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   try {
-    const request = JSON.parse(line) as RenderRequest | HealthRequest
-    if ("health" in request) {
+    const request = JSON.parse(line) as RenderRequest | RenderDocumentRequest | HealthRequest
+    if (isHealthRequest(request)) {
       write(`${JSON.stringify(okResponse())}\n`)
       return
     }
 
     write(
-      `${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)), ...protocolMetadata() })}\n`,
+      `${JSON.stringify({ ok: true, ...(await renderRequest(request, registry, documents)), ...protocolMetadata() })}\n`,
     )
   } catch (error) {
     write(

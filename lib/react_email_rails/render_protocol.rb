@@ -1,5 +1,5 @@
 module ReactEmailRails
-  RENDER_PROTOCOL_VERSION = 1
+  RENDER_PROTOCOL_VERSION = 2
 
   module RenderProtocol
     extend(self)

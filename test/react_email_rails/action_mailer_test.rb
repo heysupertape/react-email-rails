@@ -44,31 +44,31 @@ end
 
 class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
   class FakeRenderer
-    Request = Data.define(:component, :props, :render_options)
+    Request = Data.define(:payload, :label) do
+      def component = payload[:component]
+      def props = payload[:props]
+      def render_options = payload[:renderOptions]
+    end
 
     class << self
       attr_accessor(:requests)
     end
 
-    def initialize(component:, props:, render_options: {})
-      @component = component
-      @props = props
-      @render_options = render_options
+    def initialize(payload:, label:)
+      @payload = payload
+      @label = label
     end
 
     def render
-      name = @props[:name] || @props["name"]
-      self.class.requests << Request.new(
-        component: @component,
-        props: @props,
-        render_options: @render_options,
-      )
+      props = @payload[:props] || {}
+      name = props[:name] || props["name"]
+      self.class.requests << Request.new(payload: @payload, label: @label)
       ReactEmailRails::RenderedEmail.new(html: "<h1>Hello #{name}</h1>", text: "Hello #{name}")
     end
   end
 
   class FailingRenderer
-    def initialize(component:, props:, render_options: {}); end
+    def initialize(payload:, label:); end
 
     def render
       raise(ReactEmailRails::RenderError, "render process down")
@@ -90,7 +90,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/welcome", request.component)
-    assert_equal({ name: "Ada" }, request.props)
+    assert_equal({ "name" => "Ada" }, request.props)
   end
 
   test("mail react string uses explicit component and top-level props") do
@@ -98,7 +98,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/welcome", request.component)
-    assert_equal({ name: "Grace" }, request.props)
+    assert_equal({ "name" => "Grace" }, request.props)
   end
 
   test("mail react true uses instance props when enabled") do
