@@ -44,7 +44,7 @@ React Email Rails automatically renders both HTML and plain-text versions from t
 - Vite 7 or 8
 - React 18 or 19
 - `@react-email/render` 2.x
-- For [rendering editor documents](#editor) (optional): `@react-email/editor` 1.x and `@tiptap/core` 3.x
+- For [rendering editor documents](#editor) (optional): `@react-email/editor` 1.5+ and `@tiptap/core` 3.x
 
 > We recommend [rails_vite](https://github.com/skryukov/rails_vite/) for Vite with Rails.
 

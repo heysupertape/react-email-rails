@@ -4,16 +4,15 @@ import { EmailTheming } from "@react-email/editor/plugins"
 import { getSchema, resolveExtensions, type Extensions } from "@tiptap/core"
 import type { Editor } from "@tiptap/core"
 
-import type { RenderedEmail } from "./runtime.js"
+import type { DroppedNode, RenderResult } from "./runtime.js"
+
+export type { DroppedNode }
 
 export type DocumentRenderer = {
   buildExtensions: (context: unknown) => Extensions
   transformDocument?: (document: unknown, context: unknown) => unknown
   getPreview?: (context: unknown) => string | null
 }
-
-// A document node type that rendered to nothing, with how many times it occurred.
-export type DroppedNode = { type: string; count: number }
 
 // Editor-bundled structural nodes render to null by design. Derive the list from
 // the installed editor package so warning filtering tracks version changes.
@@ -65,7 +64,7 @@ export type RenderDocumentRequest = {
 export async function composeDocument(
   request: RenderDocumentRequest,
   registry: DocumentRegistry,
-): Promise<RenderedEmail & { warnings?: DroppedNode[] }> {
+): Promise<RenderResult> {
   // Fail legibly if the optional editor peers are present but their shape shifted.
   if (
     typeof composeReactEmail !== "function" ||
