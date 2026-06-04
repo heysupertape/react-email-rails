@@ -226,13 +226,6 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
 }
 
 export type {
-  DocumentLoader,
-  DocumentRegistry,
-  DocumentRenderer,
-  DroppedNode,
-  RenderDocumentRequest,
-} from "./document.js"
-export type {
   EmailModule,
   EmailRegistry,
   EmailRenderOptions,

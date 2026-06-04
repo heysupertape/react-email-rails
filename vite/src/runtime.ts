@@ -1,9 +1,6 @@
 import { render, type Options as ReactEmailRenderOptions } from "@react-email/render"
 import React from "react"
 
-// Type-only: erased at build, so runtime.js never references the editor module
-// or its peer dependencies. The email render path stays free of @react-email/editor.
-import type { DocumentRegistry, DroppedNode, RenderDocumentRequest } from "./document.js"
 import { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"
 
 export type EmailModule = {
@@ -28,15 +25,26 @@ export type RenderedEmail = {
   text: string
 }
 
+export type RenderDocumentRequest = {
+  kind: "document"
+  type: string
+  document: unknown
+  context?: unknown
+  preview?: string | null
+}
+
+// A document node type that rendered to nothing, with how many times it occurred.
+export type DroppedNode = { type: string; count: number }
+
 // A render result plus any non-fatal warnings (document nodes dropped because no
 // extension rendered them). Component renders never carry warnings.
 export type RenderResult = RenderedEmail & { warnings?: DroppedNode[] }
 
 // Injected by the generated server module when documents are enabled, so `serve`
-// renders documents without importing the editor module itself.
-export type DocumentSupport = {
-  registry: DocumentRegistry
-  compose: (request: RenderDocumentRequest, registry: DocumentRegistry) => Promise<RenderResult>
+// renders documents without importing the editor module or its peer types.
+export type DocumentSupport<Registry = unknown> = {
+  registry: Registry
+  compose: (request: RenderDocumentRequest, registry: Registry) => Promise<RenderResult>
 }
 
 type ProtocolMetadata = {
@@ -84,10 +92,10 @@ function isHealthRequest(request: unknown): request is HealthRequest {
 }
 
 // Requests without a document kind are component renders, preserving the email path.
-async function renderRequest(
+async function renderRequest<Registry>(
   request: RenderRequest | RenderDocumentRequest,
   registry: EmailRegistry,
-  documents: DocumentSupport | null,
+  documents: DocumentSupport<Registry> | null,
 ): Promise<RenderResult> {
   if (isDocumentRequest(request)) {
     if (!documents) throw new Error("React email document rendering is not enabled")
@@ -97,9 +105,9 @@ async function renderRequest(
   return renderEmail(request, registry)
 }
 
-export async function serve(
+export async function serve<Registry = unknown>(
   registry: EmailRegistry,
-  documents: DocumentSupport | null = null,
+  documents: DocumentSupport<Registry> | null = null,
 ): Promise<void> {
   if (process.argv.includes("--persistent")) {
     await servePersistent(registry, documents, isolateStdout())
@@ -149,9 +157,9 @@ function readStdin(): Promise<string> {
   })
 }
 
-async function servePersistent(
+async function servePersistent<Registry>(
   registry: EmailRegistry,
-  documents: DocumentSupport | null,
+  documents: DocumentSupport<Registry> | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   process.stdin.setEncoding("utf8")
@@ -171,10 +179,10 @@ async function servePersistent(
   }
 }
 
-async function writePersistentResponse(
+async function writePersistentResponse<Registry>(
   line: string,
   registry: EmailRegistry,
-  documents: DocumentSupport | null,
+  documents: DocumentSupport<Registry> | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   try {

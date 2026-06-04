@@ -14,4 +14,14 @@ describe("package metadata", () => {
 
     expect(pkg.peerDependencies?.vite).toBe("^7.0.0 || ^8.0.0")
   })
+
+  it("keeps root and runtime declarations free of document-only optional peers", () => {
+    const indexTypes = readFileSync(join(pkgRoot, "dist/index.d.ts"), "utf8")
+    const runtimeTypes = readFileSync(join(pkgRoot, "dist/runtime.d.ts"), "utf8")
+
+    expect(indexTypes).not.toContain("./document")
+    expect(runtimeTypes).not.toContain("./document")
+    expect(runtimeTypes).not.toContain("@react-email/editor")
+    expect(runtimeTypes).not.toContain("@tiptap/core")
+  })
 })
