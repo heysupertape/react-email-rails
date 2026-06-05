@@ -280,14 +280,17 @@ describe("parseDocument", () => {
   })
 
   it("throws when neither html nor markdown is provided", async () => {
-    await expect(parseDocument({ kind: "parse", type: "broadcast" }, { broadcast })).rejects.toThrow(
-      "exactly one of",
-    )
+    await expect(
+      parseDocument({ kind: "parse", type: "broadcast" }, { broadcast }),
+    ).rejects.toThrow("exactly one of")
   })
 
   it("throws when both html and markdown are provided", async () => {
     await expect(
-      parseDocument({ kind: "parse", type: "broadcast", html: "<p>x</p>", markdown: "x" }, { broadcast }),
+      parseDocument(
+        { kind: "parse", type: "broadcast", html: "<p>x</p>", markdown: "x" },
+        { broadcast },
+      ),
     ).rejects.toThrow("exactly one of")
   })
 })
@@ -303,7 +306,9 @@ describe("parseDocument with markdown", () => {
   }
 
   it("parses Markdown into an editor document (Tiptap JSON)", async () => {
-    const result = await parseDocument(parse("broadcast", "# Hello world\n\nBody copy"), { broadcast })
+    const result = await parseDocument(parse("broadcast", "# Hello world\n\nBody copy"), {
+      broadcast,
+    })
 
     const document = result.document as JSONNode
     expect(document.type).toBe("doc")
@@ -313,7 +318,9 @@ describe("parseDocument with markdown", () => {
   })
 
   it("produces the same document as the equivalent HTML", async () => {
-    const fromMarkdown = await parseDocument(parse("broadcast", "# Headline\n\nBody"), { broadcast })
+    const fromMarkdown = await parseDocument(parse("broadcast", "# Headline\n\nBody"), {
+      broadcast,
+    })
     const fromHtml = await parseDocument(
       { kind: "parse", type: "broadcast", html: "<h1>Headline</h1><p>Body</p>" },
       { broadcast },
