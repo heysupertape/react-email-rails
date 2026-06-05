@@ -54,9 +54,10 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
       attr_accessor(:requests)
     end
 
-    def initialize(payload:, label:)
+    def initialize(payload:, label:, response: :email)
       @payload = payload
       @label = label
+      @response = response
     end
 
     def render
@@ -68,7 +69,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
   end
 
   class FailingRenderer
-    def initialize(payload:, label:); end
+    def initialize(payload:, label:, response: :email); end
 
     def render
       raise(ReactEmailRails::RenderError, "render process down")

@@ -1,6 +1,8 @@
 class ReactEmailRails::Configuration
+  # Must match OUT_DIR/BUNDLE_FILE in vite/src/index.ts (check_version_sync.rb asserts it).
   BUNDLE_PATH = "tmp/react-email-rails/emails.js"
   BUILD_BIN = "node_modules/.bin/react-email-rails-build"
+  CONFIG_BIN = "node_modules/.bin/react-email-rails-config"
   DEV_RENDER_BIN = "node_modules/.bin/react-email-rails-dev"
 
   DEFAULT_RENDER_TIMEOUT = 10
@@ -33,6 +35,7 @@ class ReactEmailRails::Configuration
     :transform_props,
     :on_render_error,
   )
+
   attr_reader(
     :render_mode,
     :render_timeout,
@@ -83,6 +86,8 @@ class ReactEmailRails::Configuration
     end
   end
 
+  # A callable render_options is instance_exec'd against `context` (the mailer) when given,
+  # so it can use per-mail helpers; otherwise it's called or returned as-is.
   def resolve_render_options(context = nil)
     value =
       if render_options.respond_to?(:call) && context
@@ -93,7 +98,7 @@ class ReactEmailRails::Configuration
         render_options
       end
 
-    deep_camelize_keys(value.as_json)
+    deep_transform_keys(value.as_json, KEY_TRANSFORMS.fetch(:lower_camel))
   end
 
   private
@@ -120,17 +125,6 @@ class ReactEmailRails::Configuration
       value.map { |item| deep_transform_keys(item, transform) }
     when Hash
       value.transform_keys { |key| transform.call(key) }.transform_values { |item| deep_transform_keys(item, transform) }
-    else
-      value
-    end
-  end
-
-  def deep_camelize_keys(value)
-    case value
-    when Array
-      value.map { |item| deep_camelize_keys(item) }
-    when Hash
-      value.transform_keys { |key| key.to_s.camelize(:lower) }.transform_values { |item| deep_camelize_keys(item) }
     else
       value
     end

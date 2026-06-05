@@ -40,16 +40,10 @@ module ReactEmailRails
       payload = { component:, props: serialized_props(props) }
       payload[:renderOptions] = render_options if render_options.present?
 
-      instrument(kind: "email", component:) do
-        configuration.resolved_render_mode.new(payload:, label: component).render
-      end
-    rescue ReactEmailRails::RenderError => e
-      configuration.on_render_error&.call(e, kind: "email", component:)
-      raise
+      perform(payload:, label: component, kind: "email", component:)
     end
 
-    # Render an @react-email/editor document (Tiptap JSON) to HTML+text. The document
-    # is sent verbatim (its keys are structural); only context is key-transformed, like props.
+    # The document is sent verbatim (keys are structural); only context is key-transformed, like props.
     def compose(type:, document:, context: {}, preview: nil)
       payload = {
         kind: "document",
@@ -59,12 +53,7 @@ module ReactEmailRails
         preview:,
       }
 
-      instrument(kind: "document", type:) do
-        configuration.resolved_render_mode.new(payload:, label: type).render
-      end
-    rescue ReactEmailRails::RenderError => e
-      configuration.on_render_error&.call(e, kind: "document", type:)
-      raise
+      perform(payload:, label: type, kind: "document", type:)
     end
 
     # Parse HTML into an editor document Hash using the renderer's extensions.
@@ -76,12 +65,7 @@ module ReactEmailRails
         context: serialized_props(context),
       }
 
-      instrument(kind: "parse", type:) do
-        configuration.resolved_render_mode.new(payload:, label: type, response: :document).render
-      end
-    rescue ReactEmailRails::RenderError => e
-      configuration.on_render_error&.call(e, kind: "parse", type:)
-      raise
+      perform(payload:, label: type, response: :document, kind: "parse", type:)
     end
 
     def healthy?
@@ -94,6 +78,15 @@ module ReactEmailRails
     end
 
     private
+
+    def perform(payload:, label:, response: :email, **metadata)
+      instrument(**metadata) do
+        configuration.resolved_render_mode.new(payload:, label:, response:).render
+      end
+    rescue ReactEmailRails::RenderError => e
+      configuration.on_render_error&.call(e, **metadata)
+      raise
+    end
 
     def serialized_props(value)
       configuration.send(:serialize_props, value)

@@ -3,8 +3,6 @@ require("fileutils")
 require("rake")
 
 class ReactEmailRails::TasksTest < ActiveSupport::TestCase
-  RUBY = RbConfig.ruby
-  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
   HEALTH_OK = [
     RUBY,
     "-e",

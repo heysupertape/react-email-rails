@@ -12,8 +12,7 @@ export type EmailsOption =
 
 export type ReactEmailRailsOptions = {
   emails?: EmailsOption
-  // Editor document renderers, discovered like emails. Off by default; pass `true`
-  // to enable with defaults, or a path/options object to customize discovery.
+  // Editor document renderers, discovered like emails. Off by default.
   documents?: EmailsOption | boolean
   standalone?: boolean
   vite?: ReactEmailRailsViteOptions
@@ -62,17 +61,17 @@ const VIRTUAL_MODULE_PATTERN = /virtual:react-email-rails\/(?:server|main)$/
 
 // The dedicated build environment that emits the server-side email bundle.
 export const EMAIL_ENVIRONMENT = "email"
+// Wire contract: must match the Symbol.for(...) keys the bins read in bin/shared.mjs.
 const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
 const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
+// Must match Ruby's Configuration::BUNDLE_PATH (check_version_sync.rb asserts it).
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 const require = createRequire(import.meta.url)
 
-// happy-dom (pulled in by @tiptap/html when parsing) depends on `ws`, which guards
-// optional native-addon requires behind these env flags. A standalone (noExternal)
-// build would otherwise try to bundle the uninstalled `bufferutil`/`utf-8-validate`
-// and fail at load. Setting the flags lets Rollup tree-shake those require branches
-// away; ws uses its pure-JS implementation, which is all the HTML parser needs.
+// happy-dom (via @tiptap/html) pulls in `ws`, which guards optional native-addon requires behind
+// these flags. Setting them lets a standalone (noExternal) build tree-shake the uninstalled
+// bufferutil/utf-8-validate requires away; ws's pure-JS path is all the HTML parser needs.
 const WS_NATIVE_ADDON_OPT_OUT = {
   "process.env.WS_NO_BUFFER_UTIL": "'1'",
   "process.env.WS_NO_UTF_8_VALIDATE": "'1'",
@@ -152,7 +151,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       filter: { id: VIRTUAL_MODULE_PATTERN },
       handler(id) {
         if (id === RESOLVED_SERVER) {
-          const lines = [`import { serve, toComponentName } from "react-email-rails/runtime"`]
+          const lines = [`import { buildRegistry, serve } from "react-email-rails/runtime"`]
           const parserPeersAvailable =
             documentSource && optionalPeersAvailable(["@tiptap/html", "happy-dom"])
 
@@ -166,24 +165,12 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
           }
 
           lines.push(
-            `const modules = import.meta.glob(${emailSource.globArg})`,
-            `const extensions = ${JSON.stringify(emailSource.extensions)}`,
-            `const registry = Object.create(null)`,
-            `for (const path in modules) {`,
-            `  const extension = extensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
-            `  registry[toComponentName(path, ${JSON.stringify(emailSource.root)}, extension)] = modules[path]`,
-            `}`,
+            `const registry = buildRegistry(import.meta.glob(${emailSource.globArg}), ${JSON.stringify(emailSource.extensions)}, ${JSON.stringify(emailSource.root)})`,
           )
 
           if (documentSource) {
             lines.push(
-              `const documentModules = import.meta.glob(${documentSource.globArg})`,
-              `const documentExtensions = ${JSON.stringify(documentSource.extensions)}`,
-              `const documentRegistry = Object.create(null)`,
-              `for (const path in documentModules) {`,
-              `  const extension = documentExtensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
-              `  documentRegistry[toComponentName(path, ${JSON.stringify(documentSource.root)}, extension)] = documentModules[path]`,
-              `}`,
+              `const documentRegistry = buildRegistry(import.meta.glob(${documentSource.globArg}), ${JSON.stringify(documentSource.extensions)}, ${JSON.stringify(documentSource.root)})`,
               `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: ${parserPeersAvailable ? "createParseDocument(generateJSON)" : "parseDocument"} })`,
             )
           } else {
@@ -200,13 +187,9 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
     },
 
     config(_config, env: ConfigEnv) {
-      // Register a dedicated `email` build environment. The official
-      // react-email-rails-build bin opts into building it with an isolated
-      // plugin stack so host app plugins cannot break email SSR builds.
-      // The environment is a server consumer. Production standalone builds inline
-      // Node dependencies by default so Rails runtime images do not need
-      // node_modules; dev rendering keeps dependencies external for Vite's module
-      // runner.
+      // Dedicated `email` build environment: the react-email-rails-build bin builds it with an
+      // isolated plugin stack so host plugins can't break email SSR. Standalone builds inline
+      // Node deps (so Rails images need no node_modules); dev keeps them external for the runner.
       return {
         environments: {
           [EMAIL_ENVIRONMENT]: {

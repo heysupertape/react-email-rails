@@ -2,20 +2,10 @@ require("json")
 require("test_helper")
 
 class ReactEmailRailsTest < ActiveSupport::TestCase
-  RUBY = RbConfig.ruby
-  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
-
   RENDER_FIXED = [
     RUBY,
     "-e",
     "require \"json\"; $stdin.read; $stdout.write(JSON.generate(html: \"<p>Hi</p>\", text: \"Hi\", #{RENDER_METADATA}))",
-  ].freeze
-
-  # Echoes the request payload back as the HTML body so tests can assert it.
-  ECHO_INPUT = [
-    RUBY,
-    "-e",
-    "require \"json\"; $stdout.write(JSON.generate(html: $stdin.read, text: \"\", #{RENDER_METADATA}))",
   ].freeze
 
   COMPOSE_PERSISTENT = [
@@ -85,6 +75,9 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     RUBY
     "--",
   ].freeze
+
+  # stop_all is idempotent; tear down any persistent child unconditionally.
+  teardown { ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all }
 
   test("render emits a render.react-email-rails notification with component and html size") do
     events = []
@@ -196,8 +189,6 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     assert_equal("<p>broadcast</p>", rendered.html)
     assert_equal("document", rendered.text)
     assert_equal([{ type: "embed", count: 1 }], rendered.warnings)
-  ensure
-    ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
   end
 
   test("compose surfaces dropped-node warnings on the result and in instrumentation") do
@@ -280,8 +271,6 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     end
 
     assert_equal({ "type" => "doc", "source" => "<h1>Hi</h1>" }, document)
-  ensure
-    ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
   end
 
   test("parse raises when the renderer response has no document") do
@@ -355,8 +344,6 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
         assert(ReactEmailRails.healthy?)
       end
     end
-  ensure
-    ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
   end
 
   test("healthy? returns false when the command fails") do

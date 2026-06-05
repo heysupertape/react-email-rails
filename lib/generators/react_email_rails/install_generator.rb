@@ -1,4 +1,5 @@
 require("json")
+require_relative("vite_config_files")
 
 module ReactEmailRails; end
 module ReactEmailRails::Generators; end
@@ -21,14 +22,7 @@ class ReactEmailRails::Generators::InstallGenerator < Rails::Generators::Base
   }.freeze
 
   SUPPORTED_PACKAGE_MANAGERS = ["bun", "npm", "pnpm", "yarn"].freeze
-  VITE_CONFIG_FILES = [
-    "vite.config.ts",
-    "vite.config.mts",
-    "vite.config.js",
-    "vite.config.mjs",
-    "vite.config.cts",
-    "vite.config.cjs",
-  ].freeze
+  VITE_CONFIG_FILES = ReactEmailRails::Generators::VITE_CONFIG_FILES
 
   VITE_IMPORT = 'import { reactEmailRails } from "react-email-rails"'
 

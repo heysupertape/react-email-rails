@@ -107,7 +107,7 @@ jobs:
         uses: rubygems/configure-rubygems-credentials@v2.0.0
 
       - name: Publish gem to RubyGems
-        run: gem push "${{ steps.release.outputs.gem_path }}"
+        run: gem push "pkg/${{ steps.release.outputs.gem_path }}"
 
       - name: Install Vite package dependencies
         run: pnpm install --frozen-lockfile
@@ -138,7 +138,7 @@ jobs:
       - name: Create GitHub release
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "${{ steps.release.outputs.gem_path }}" \
+            "pkg/${{ steps.release.outputs.gem_path }}" \
             "pkg/${{ steps.release.outputs.npm_package }}" \
             --title "$GITHUB_REF_NAME" \
             --notes-file .release-notes.md \

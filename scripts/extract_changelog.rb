@@ -1,17 +1,17 @@
 #!/usr/bin/env ruby
+require_relative("changelog")
+
 version = ARGV.fetch(0) do
   abort("Usage: ruby scripts/extract_changelog.rb X.Y.Z")
 end
 
 changelog = File.read(File.expand_path("../CHANGELOG.md", __dir__))
-match = changelog.match(/^## #{Regexp.escape(version)}\n\n(?<notes>.*?)(?=\n## |\z)/m)
+notes, status = Changelog.notes_for(changelog, version)
 
-unless match
+case status
+when :missing
   abort("CHANGELOG.md is missing a ## #{version} section")
-end
-
-notes = match[:notes].strip
-if notes.empty? || notes.match?(/\b(TODO|TBD)\b/i)
+when :empty
   abort("CHANGELOG.md section ## #{version} needs release notes before publishing")
 end
 

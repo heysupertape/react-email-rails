@@ -2,16 +2,14 @@ class ReactEmailRails::RenderModes::Subprocess
   class << self
     def healthy?(command:, timeout:)
       result = CommandRunner.capture([*command, "--health"], timeout:)
-      result.status.success? && ReactEmailRails::RenderProtocol.compatible_response?(JSON.parse(result.stdout))
+      ReactEmailRails::RenderProtocol.healthy_result?(result)
     rescue StandardError
       false
     end
   end
 
-  # Payload-agnostic transport: the caller builds and serializes the payload.
-  # `label` identifies the render in error messages (component name or document type).
-  # `response` selects how the renderer's reply is interpreted: `:email` builds a
-  # RenderedEmail (render/compose), `:document` returns the parsed document (parse).
+  # `label` names the render in error messages. `response` reads the reply as `:email`
+  # (RenderedEmail, for render/compose) or `:document` (parsed document, for parse).
   def initialize(payload:, label:, response: :email)
     @payload = payload
     @label = label
@@ -40,8 +38,15 @@ class ReactEmailRails::RenderModes::Subprocess
   end
 
   def capture(input)
-    validate_command!
-    CommandRunner.capture(command, input:, timeout: render_timeout)
+    with_capture_rescues do
+      validate_command!
+      CommandRunner.capture(command, input:, timeout: render_timeout)
+    end
+  end
+
+  # Shared by Persistent#capture so the transport-error messages live in one place.
+  def with_capture_rescues
+    yield
   rescue Timeout::Error
     raise(render_error("render process timed out after #{render_timeout}s"))
   rescue Errno::ENOENT

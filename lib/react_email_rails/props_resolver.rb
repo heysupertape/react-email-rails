@@ -34,8 +34,7 @@ class ReactEmailRails::PropsResolver
   end
 
   def assign_props
-    # `react: true` infers the component name; instance vars become props only when the
-    # mailer opts in. Without it, the component renders with no props.
+    # `react: true` infers the component; instance vars become props only when the mailer opts in.
     return {} unless mailer.class.react_email_use_instance_props
 
     mailer.instance_variables.each_with_object({}) do |ivar, props|
