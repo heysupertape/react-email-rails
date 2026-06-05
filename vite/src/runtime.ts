@@ -33,6 +33,13 @@ export type RenderDocumentRequest = {
   preview?: string | null
 }
 
+export type ParseDocumentRequest = {
+  kind: "parse"
+  type: string
+  html: string
+  context?: unknown
+}
+
 // A document node type that rendered to nothing, with how many times it occurred.
 export type DroppedNode = { type: string; count: number }
 
@@ -40,11 +47,14 @@ export type DroppedNode = { type: string; count: number }
 // extension rendered them). Component renders never carry warnings.
 export type RenderResult = RenderedEmail & { warnings?: DroppedNode[] }
 
+export type ParseResult = { document: unknown }
+
 // Injected by the generated server module when documents are enabled, so `serve`
 // renders documents without importing the editor module or its peer types.
 export type DocumentSupport<Registry = unknown> = {
   registry: Registry
   compose: (request: RenderDocumentRequest, registry: Registry) => Promise<RenderResult>
+  parse: (request: ParseDocumentRequest, registry: Registry) => Promise<ParseResult>
 }
 
 type ProtocolMetadata = {
@@ -87,19 +97,31 @@ function isDocumentRequest(request: unknown): request is RenderDocumentRequest {
   )
 }
 
+function isParseRequest(request: unknown): request is ParseDocumentRequest {
+  return (
+    request !== null &&
+    typeof request === "object" &&
+    (request as { kind?: unknown }).kind === "parse"
+  )
+}
+
 function isHealthRequest(request: unknown): request is HealthRequest {
   return request !== null && typeof request === "object" && "health" in request
 }
 
-// Requests without a document kind are component renders, preserving the email path.
 async function renderRequest<Registry>(
-  request: RenderRequest | RenderDocumentRequest,
+  request: RenderRequest | RenderDocumentRequest | ParseDocumentRequest,
   registry: EmailRegistry,
   documents: DocumentSupport<Registry> | null,
-): Promise<RenderResult> {
+): Promise<RenderResult | ParseResult> {
   if (isDocumentRequest(request)) {
     if (!documents) throw new Error("React email document rendering is not enabled")
     return documents.compose(request, documents.registry)
+  }
+
+  if (isParseRequest(request)) {
+    if (!documents) throw new Error("React email document rendering is not enabled")
+    return documents.parse(request, documents.registry)
   }
 
   return renderEmail(request, registry)
@@ -121,7 +143,10 @@ export async function serve<Registry = unknown>(
 
   const write = isolateStdout()
   try {
-    const request = JSON.parse(await readStdin()) as RenderRequest | RenderDocumentRequest
+    const request = JSON.parse(await readStdin()) as
+      | RenderRequest
+      | RenderDocumentRequest
+      | ParseDocumentRequest
     write(
       JSON.stringify({
         ...(await renderRequest(request, registry, documents)),
@@ -186,7 +211,11 @@ async function writePersistentResponse<Registry>(
   write: (chunk: string) => boolean,
 ): Promise<void> {
   try {
-    const request = JSON.parse(line) as RenderRequest | RenderDocumentRequest | HealthRequest
+    const request = JSON.parse(line) as
+      | RenderRequest
+      | RenderDocumentRequest
+      | ParseDocumentRequest
+      | HealthRequest
     if (isHealthRequest(request)) {
       write(`${JSON.stringify(okResponse())}\n`)
       return

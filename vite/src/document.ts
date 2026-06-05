@@ -4,7 +4,7 @@ import { EmailTheming } from "@react-email/editor/plugins"
 import { getSchema, resolveExtensions, type Extensions } from "@tiptap/core"
 import type { Editor } from "@tiptap/core"
 
-import type { DroppedNode, RenderResult } from "./runtime.js"
+import type { DroppedNode, ParseResult, RenderResult } from "./runtime.js"
 
 export type { DroppedNode }
 
@@ -61,6 +61,47 @@ export type RenderDocumentRequest = {
   preview?: string | null
 }
 
+export type ParseDocumentRequest = {
+  kind: "parse"
+  type: string
+  html: string
+  context?: unknown
+}
+
+type GenerateJSON = (html: string, extensions: Extensions) => unknown
+
+async function resolveRenderer(
+  type: string,
+  registry: DocumentRegistry,
+): Promise<DocumentRenderer> {
+  const loader = registry[type]
+  if (!loader) throw new Error(`React email document renderer not found: ${type}`)
+
+  const renderer = typeof loader === "function" ? await loader() : loader
+  if (typeof renderer.buildExtensions !== "function") {
+    throw new Error(`React email document renderer must export a buildExtensions function: ${type}`)
+  }
+
+  return renderer
+}
+
+async function loadGenerateJSON(): Promise<GenerateJSON> {
+  try {
+    const mod = (await import(/* @vite-ignore */ "@tiptap/html")) as {
+      generateJSON?: unknown
+    }
+    if (typeof mod.generateJSON === "function") return mod.generateJSON as GenerateJSON
+  } catch (error) {
+    throw new Error(
+      `@tiptap/html and happy-dom are required to parse HTML documents; install both packages before calling parse (${error instanceof Error ? error.message : "module load failed"})`,
+    )
+  }
+
+  throw new Error(
+    "@tiptap/html is missing the expected generateJSON export; check the installed version",
+  )
+}
+
 export async function composeDocument(
   request: RenderDocumentRequest,
   registry: DocumentRegistry,
@@ -76,15 +117,7 @@ export async function composeDocument(
     )
   }
 
-  const loader = registry[request.type]
-  if (!loader) throw new Error(`React email document renderer not found: ${request.type}`)
-
-  const renderer = typeof loader === "function" ? await loader() : loader
-  if (typeof renderer.buildExtensions !== "function") {
-    throw new Error(
-      `React email document renderer must export a buildExtensions function: ${request.type}`,
-    )
-  }
+  const renderer = await resolveRenderer(request.type, registry)
 
   const document =
     renderer.transformDocument?.(request.document, request.context) ?? request.document
@@ -107,4 +140,25 @@ export async function composeDocument(
 
   const { html, text } = await composeReactEmail(params)
   return warnings.length > 0 ? { html, text, warnings } : { html, text }
+}
+
+export async function parseDocument(
+  request: ParseDocumentRequest,
+  registry: DocumentRegistry,
+  generateJSON?: GenerateJSON,
+): Promise<ParseResult> {
+  const parseHTML = generateJSON ?? (await loadGenerateJSON())
+  const renderer = await resolveRenderer(request.type, registry)
+  const extensions = resolveExtensions(renderer.buildExtensions(request.context))
+  const schema = getSchema(extensions)
+
+  const parsed = parseHTML(request.html, extensions)
+  const document = schema.nodeFromJSON(parsed).toJSON()
+
+  return { document }
+}
+
+export function createParseDocument(generateJSON: GenerateJSON) {
+  return (request: ParseDocumentRequest, registry: DocumentRegistry): Promise<ParseResult> =>
+    parseDocument(request, registry, generateJSON)
 }

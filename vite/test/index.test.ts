@@ -334,11 +334,14 @@ describe("reactEmailRails plugin", () => {
     const plugin = reactEmailRails({ documents: true })
     const source = loadVirtualServer(plugin)
 
-    expect(source).toContain('import { composeDocument } from "react-email-rails/document"')
+    expect(source).toContain(
+      'import { composeDocument, createParseDocument } from "react-email-rails/document"',
+    )
+    expect(source).toContain('import { generateJSON } from "@tiptap/html"')
     expect(source).toContain('"/app/javascript/documents/**/*{.tsx,.ts}"')
     expect(source).toContain('const documentExtensions = [".tsx",".ts"]')
     expect(source).toContain(
-      "export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument })",
+      "export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: createParseDocument(generateJSON) })",
     )
     // The email registry is still built exactly as before.
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')

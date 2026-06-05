@@ -311,6 +311,12 @@ Install the editor packages:
 npm i @react-email/editor @tiptap/core
 ```
 
+To also parse HTML into documents with [`parse`](#parsing-html-into-a-document), add `@tiptap/html` and its server DOM, `happy-dom`:
+
+```sh
+npm i @tiptap/html happy-dom
+```
+
 Enable the `documents` option in your Vite config:
 
 ```ts
@@ -397,7 +403,7 @@ broadcast = Broadcast.find(params[:id])
 
 rendered = ReactEmailRails.compose(
   type: "broadcast",
-  document: broadcast.body,          # Tiptap JSON, e.g. a jsonb column
+  document: broadcast.body,          # a Hash in Tiptap's shape, e.g. from a jsonb column
   context: { brand_name: "Acme", preview_text: broadcast.subject },
   preview: broadcast.subject,        # optional; falls back to getPreview(context)
 )
@@ -408,9 +414,39 @@ rendered.text # => "ACME\n\n..."
 
 It returns the same `RenderedEmail` (`html`/`text`) as `render`, runs through the same [render modes](#render-modes), and raises `ReactEmailRails::RenderError` on failure. Documents don't go through Action Mailer — broadcasts and the like usually have their own delivery path — so deliver `rendered.html`/`rendered.text` however your app sends mail.
 
-**Keys:** `context` is key-transformed exactly like component props (so `brand_name` arrives as `brandName`, per [`transform_props`](#prop-transformation)). The **`document` is passed through verbatim** — its keys (`type`, `attrs`, `content`, `marks`, node names, `globalContent`) are structural and are never transformed.
+**The document is a `Hash`.** You pass and store it as a plain Ruby `Hash` with string keys — what a jsonb column hands back, and what [`parse`](#parsing-html-into-a-document) returns. "Tiptap JSON" names the document's *shape* (and the format it's serialized to over the wire to the renderer), not the Ruby type; `compose` accepts any object that responds to `as_json`, but a `Hash` is the norm.
+
+**Keys:** the document's keys (`type`, `attrs`, `content`, `marks`, node names, `globalContent`) are structural and **passed through verbatim** — never transformed. Only `context` is key-transformed, camelized exactly like component props (so `brand_name` arrives as `brandName`, per [`transform_props`](#prop-transformation)).
 
 `render_options` does not apply to documents; `composeReactEmail` controls its own rendering.
+
+### Parsing HTML into a Document
+
+`ReactEmailRails.parse` converts semantic HTML into the same document `Hash` shape the editor stores, using the selected renderer's extensions. This needs the `@tiptap/html` and `happy-dom` packages (see [Setup](#setup)).
+
+```ruby
+document = ReactEmailRails.parse(
+  type: "broadcast",                 # the same renderer type compose uses
+  html: params[:body_html],          # the HTML the caller sent
+  context: { brand_name: "Acme" },   # optional; reaches buildExtensions, like compose
+)
+
+broadcast.update!(body: document)    # persist the Hash (e.g. to a jsonb column)
+```
+
+Later, render the stored document like any other:
+
+```ruby
+rendered = ReactEmailRails.compose(type: "broadcast", document: broadcast.body)
+```
+
+`parse` returns a plain Ruby `Hash` with string keys, normalized through the renderer's schema. It uses the same [render modes](#render-modes) as `compose` and raises `ReactEmailRails::RenderError` on failure. `context` is key-transformed like component props; the HTML is sent verbatim.
+
+What this means in practice:
+
+- HTML maps to a node only when an extension defines how to parse it. Unknown elements, inline styles, and classes may be dropped or flattened.
+- Editor-only constructs such as custom email nodes and the persisted `globalContent` theme node do not round-trip from plain HTML.
+- If you already have the document `Hash`, pass it to `compose` directly.
 
 ### Debugging Dropped Content
 
@@ -510,7 +546,7 @@ end
 
 #### Error Reporting
 
-Use `on_render_error` to report failures before the exception is re-raised. The callback receives the error and a `context` of `kind:` (`"email"` or `"document"`) plus the identifier — `component:` for emails, `type:` for documents. Accept `**context` so one handler covers both render kinds:
+Use `on_render_error` to report failures before the exception is re-raised. The callback receives the error and a `context` of `kind:` (`"email"`, `"document"`, or `"parse"`) plus the identifier — `component:` for emails, `type:` for documents and parse requests. Accept `**context` so one handler covers every render kind:
 
 ```ruby
 ReactEmailRails.configure do |config|
@@ -522,7 +558,7 @@ end
 
 #### Instrumentation
 
-Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries a `kind` (`"email"` or `"document"`), the `component` name (email) or `type` (document), and, on success, the rendered HTML size in `html_bytes`. Document renders that drop content also include `warnings` (see [Debugging Dropped Content](#debugging-dropped-content)):
+Every render emits an [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html) event named `render.react-email-rails`, so you can log render timing or forward it to your APM. The payload carries a `kind` (`"email"`, `"document"`, or `"parse"`), the `component` name (email) or `type` (document and parse), and, on a successful render, the rendered HTML size in `html_bytes` (omitted for `parse`, which returns a document rather than HTML). Document renders that drop content also include `warnings` (see [Debugging Dropped Content](#debugging-dropped-content)):
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|

@@ -1,3 +1,5 @@
+import { createRequire } from "node:module"
+
 import type { ConfigEnv, Plugin, UserConfig } from "vite"
 
 export type EmailsOption =
@@ -64,6 +66,7 @@ const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
 const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
+const require = createRequire(import.meta.url)
 
 function normalizeSource(
   option: EmailsOption | undefined,
@@ -101,6 +104,17 @@ function normalizeSource(
   return { path, extensions, ignore, root, globArg }
 }
 
+function optionalPeersAvailable(specifiers: string[]): boolean {
+  return specifiers.every((specifier) => {
+    try {
+      require.resolve(specifier)
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
 export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
   const emailSource = normalizeSource(options.emails, DEFAULT_EMAIL_PATH, DEFAULT_EMAIL_EXTENSIONS)
   const documentSource =
@@ -129,10 +143,17 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       handler(id) {
         if (id === RESOLVED_SERVER) {
           const lines = [`import { serve, toComponentName } from "react-email-rails/runtime"`]
+          const parserPeersAvailable =
+            documentSource && optionalPeersAvailable(["@tiptap/html", "happy-dom"])
 
-          // Imported only here, so the editor stays out of the email build graph when off.
-          if (documentSource)
-            lines.push(`import { composeDocument } from "react-email-rails/document"`)
+          if (documentSource) {
+            lines.push(
+              parserPeersAvailable
+                ? `import { composeDocument, createParseDocument } from "react-email-rails/document"`
+                : `import { composeDocument, parseDocument } from "react-email-rails/document"`,
+            )
+            if (parserPeersAvailable) lines.push(`import { generateJSON } from "@tiptap/html"`)
+          }
 
           lines.push(
             `const modules = import.meta.glob(${emailSource.globArg})`,
@@ -153,7 +174,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
               `  const extension = documentExtensions.find((extension) => path.endsWith(extension)) ?? path.slice(path.lastIndexOf("."))`,
               `  documentRegistry[toComponentName(path, ${JSON.stringify(documentSource.root)}, extension)] = documentModules[path]`,
               `}`,
-              `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument })`,
+              `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: ${parserPeersAvailable ? "createParseDocument(generateJSON)" : "parseDocument"} })`,
             )
           } else {
             lines.push(`export const run = () => serve(registry)`)

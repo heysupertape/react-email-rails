@@ -3,7 +3,12 @@ import { EmailTheming } from "@react-email/editor/plugins"
 import { Node } from "@tiptap/core"
 import { describe, expect, it } from "vitest"
 
-import { composeDocument, type DocumentRegistry, type DocumentRenderer } from "../src/document"
+import {
+  composeDocument,
+  type DocumentRegistry,
+  type DocumentRenderer,
+  parseDocument,
+} from "../src/document"
 
 type JSONNode = {
   type: string
@@ -183,5 +188,91 @@ describe("composeDocument", () => {
     expect(result.warnings).toEqual([{ type: "customBlock", count: 2 }])
     expect(result.html).not.toContain("dropped one")
     expect(result.html).toContain("kept")
+  })
+})
+
+describe("parseDocument", () => {
+  function parse(type: string, html: string, context?: unknown) {
+    return {
+      kind: "parse" as const,
+      type,
+      html,
+      ...(context === undefined ? {} : { context }),
+    }
+  }
+
+  it("parses HTML into an editor document (Tiptap JSON)", async () => {
+    const result = await parseDocument(parse("broadcast", "<h1>Hello world</h1><p>Body copy</p>"), {
+      broadcast,
+    })
+
+    const document = result.document as JSONNode
+    expect(document.type).toBe("doc")
+    const types = (document.content ?? []).map((node) => node.type)
+    expect(types).toContain("heading")
+    expect(types).toContain("paragraph")
+  })
+
+  it("produces a document that composes identically to editor-authored JSON", async () => {
+    const parsed = await parseDocument(parse("broadcast", "<h1>Headline</h1><p>Body</p>"), {
+      broadcast,
+    })
+
+    const authored: JSONNode = {
+      type: "doc",
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Headline" }] },
+        { type: "paragraph", content: [{ type: "text", text: "Body" }] },
+      ],
+    }
+
+    const fromParsed = await composeDocument(
+      { kind: "document", type: "broadcast", document: parsed.document },
+      { broadcast },
+    )
+    const fromAuthored = await composeDocument(
+      { kind: "document", type: "broadcast", document: authored },
+      { broadcast },
+    )
+
+    expect(fromParsed.html).toBe(fromAuthored.html)
+    expect(fromParsed.text).toBe(fromAuthored.text)
+  })
+
+  it("returns a canonical document that round-trips unchanged", async () => {
+    const first = await parseDocument(parse("broadcast", "<p>Stable</p>"), { broadcast })
+    const second = await parseDocument(parse("broadcast", "<p>Stable</p>"), { broadcast })
+
+    expect(second.document).toEqual(first.document)
+  })
+
+  it("throws when the renderer is not found", async () => {
+    await expect(parseDocument(parse("missing", "<p>x</p>"), {})).rejects.toThrow(
+      "document renderer not found: missing",
+    )
+  })
+
+  it("throws when the renderer does not export buildExtensions", async () => {
+    const registry = { broken: {} as DocumentRenderer }
+
+    await expect(parseDocument(parse("broken", "<p>x</p>"), registry)).rejects.toThrow(
+      "buildExtensions",
+    )
+  })
+
+  it("passes context to buildExtensions", async () => {
+    let seen: unknown
+    const registry: DocumentRegistry = {
+      broadcast: {
+        buildExtensions: (context) => {
+          seen = context
+          return [StarterKit, EmailTheming]
+        },
+      },
+    }
+
+    await parseDocument(parse("broadcast", "<p>x</p>", { brand: "Acme" }), registry)
+
+    expect(seen).toEqual({ brand: "Acme" })
   })
 })

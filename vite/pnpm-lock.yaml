@@ -17,6 +17,12 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.25.0(@tiptap/pm@3.25.0)
+      '@tiptap/html':
+        specifier: ^3
+        version: 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.9.0)
+      '@tiptap/pm':
+        specifier: ^3
+        version: 3.25.0
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -26,6 +32,9 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260527.2
         version: 7.0.0-dev.20260527.2
+      happy-dom:
+        specifier: ^20.8.9
+        version: 20.9.0
       oxfmt:
         specifier: ^0.52.0
         version: 0.52.0

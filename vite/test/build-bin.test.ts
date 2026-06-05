@@ -196,7 +196,7 @@ describe("react-email-rails-build", () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, protocolVersion: RENDER_PROTOCOL_VERSION })
   }, 60_000)
 
-  it("renders an editor document from a standalone bundle with tiptap inlined", async () => {
+  it("renders and parses editor documents from a standalone bundle with tiptap inlined", async () => {
     const root = mkdtempSync(join(pkgRoot, "node_modules", ".rer-build-bin-documents-"))
     const isolated = mkdtempSync(join(tmpdir(), "rer-documents-"))
     fixtures.push(root, isolated)
@@ -277,6 +277,25 @@ describe("react-email-rails-build", () => {
     expect(response.html).toContain("Broadcast headline")
     expect(response.html).toContain("Inbox preview")
     expect(response.text).toMatch(/broadcast headline/i)
+
+    const parsed = (await renderWithBundle(
+      isolatedBundlePath,
+      { kind: "parse", type: "broadcast", html: "<h1>Parsed headline</h1><p>From HTML</p>" },
+      isolated,
+    )) as { document: { type: string; content: { type: string }[] }; protocolVersion: number }
+
+    expect(parsed.protocolVersion).toBe(RENDER_PROTOCOL_VERSION)
+    expect(parsed.document.type).toBe("doc")
+    expect(parsed.document.content.some((node) => node.type === "heading")).toBe(true)
+
+    const rendered = (await renderWithBundle(
+      isolatedBundlePath,
+      { kind: "document", type: "broadcast", document: parsed.document },
+      isolated,
+    )) as { html: string }
+
+    expect(rendered.html).toContain("Parsed headline")
+    expect(rendered.html).toContain("From HTML")
   }, 90_000)
 })
 
