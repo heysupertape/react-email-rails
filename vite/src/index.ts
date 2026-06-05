@@ -68,11 +68,15 @@ const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 const require = createRequire(import.meta.url)
 
-// happy-dom (pulled in by @tiptap/html when parsing) depends on `ws`, which lazily
-// requires these optional native addons inside a try/catch. Keep them external so a
-// standalone (noExternal) build doesn't fail trying to resolve them; ws falls back to
-// its pure-JS implementation when they're absent at runtime.
-const OPTIONAL_NATIVE_ADDONS = ["bufferutil", "utf-8-validate"]
+// happy-dom (pulled in by @tiptap/html when parsing) depends on `ws`, which guards
+// optional native-addon requires behind these env flags. A standalone (noExternal)
+// build would otherwise try to bundle the uninstalled `bufferutil`/`utf-8-validate`
+// and fail at load. Setting the flags lets Rollup tree-shake those require branches
+// away; ws uses its pure-JS implementation, which is all the HTML parser needs.
+const WS_NATIVE_ADDON_OPT_OUT = {
+  "process.env.WS_NO_BUFFER_UTIL": "'1'",
+  "process.env.WS_NO_UTF_8_VALIDATE": "'1'",
+}
 
 function normalizeSource(
   option: EmailsOption | undefined,
@@ -207,7 +211,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
         environments: {
           [EMAIL_ENVIRONMENT]: {
             ...(standalone && env.command === "build"
-              ? { resolve: { noExternal: true, external: OPTIONAL_NATIVE_ADDONS } }
+              ? { resolve: { noExternal: true }, define: WS_NATIVE_ADDON_OPT_OUT }
               : {}),
             build: {
               ssr: true,
