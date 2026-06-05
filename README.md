@@ -69,7 +69,7 @@ This creates `config/initializers/react_email_rails.rb`, installs missing JavaSc
 The installed setup then follows the normal Rails lifecycle:
 
 - `bin/rails generate react_email_rails:email ...` creates matching mailers and React components.
-- Development renders through Vite on demand.
+- `bin/dev` renders through Vite on demand.
 - `bin/rails assets:precompile` builds the production renderer bundle automatically.
 - `bin/rails react_email_rails:build` builds the bundle directly when CI or tests need it.
 
