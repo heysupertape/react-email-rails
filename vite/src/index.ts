@@ -68,6 +68,12 @@ const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 const require = createRequire(import.meta.url)
 
+// happy-dom (pulled in by @tiptap/html when parsing) depends on `ws`, which lazily
+// requires these optional native addons inside a try/catch. Keep them external so a
+// standalone (noExternal) build doesn't fail trying to resolve them; ws falls back to
+// its pure-JS implementation when they're absent at runtime.
+const OPTIONAL_NATIVE_ADDONS = ["bufferutil", "utf-8-validate"]
+
 function normalizeSource(
   option: EmailsOption | undefined,
   defaultPath: string,
@@ -200,7 +206,9 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       return {
         environments: {
           [EMAIL_ENVIRONMENT]: {
-            ...(standalone && env.command === "build" ? { resolve: { noExternal: true } } : {}),
+            ...(standalone && env.command === "build"
+              ? { resolve: { noExternal: true, external: OPTIONAL_NATIVE_ADDONS } }
+              : {}),
             build: {
               ssr: true,
               outDir: OUT_DIR,
