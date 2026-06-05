@@ -56,14 +56,14 @@ module ReactEmailRails
       perform(payload:, label: type, kind: "document", type:)
     end
 
-    # Parse HTML into an editor document Hash using the renderer's extensions.
-    def parse(type:, html:, context: {})
+    # Parse semantic HTML or Markdown into an editor document Hash using the renderer's
+    # extensions. Pass exactly one of `html:` or `markdown:`.
+    def parse(type:, html: nil, markdown: nil, context: {})
       payload = {
         kind: "parse",
         type:,
-        html: html.to_s,
         context: serialized_props(context),
-      }
+      }.merge(parse_source(html:, markdown:))
 
       perform(payload:, label: type, response: :document, kind: "parse", type:)
     end
@@ -86,6 +86,18 @@ module ReactEmailRails
     rescue ReactEmailRails::RenderError => e
       configuration.on_render_error&.call(e, **metadata)
       raise
+    end
+
+    # Markdown is converted renderer-side, not here; both inputs are sent as-is.
+    def parse_source(html:, markdown:)
+      if !html.nil? && !markdown.nil?
+        raise(ArgumentError, "ReactEmailRails.parse accepts only one of html: or markdown:")
+      end
+
+      return { html: html.to_s } unless html.nil?
+      return { markdown: markdown.to_s } unless markdown.nil?
+
+      raise(ArgumentError, "ReactEmailRails.parse requires html: or markdown:")
     end
 
     def serialized_props(value)
