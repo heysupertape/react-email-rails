@@ -67,6 +67,23 @@ module ReactEmailRails
       raise
     end
 
+    # Parse HTML into an editor document Hash using the renderer's extensions.
+    def parse(type:, html:, context: {})
+      payload = {
+        kind: "parse",
+        type:,
+        html: html.to_s,
+        context: serialized_props(context),
+      }
+
+      instrument(kind: "parse", type:) do
+        configuration.resolved_render_mode.new(payload:, label: type, response: :document).render
+      end
+    rescue ReactEmailRails::RenderError => e
+      configuration.on_render_error&.call(e, kind: "parse", type:)
+      raise
+    end
+
     def healthy?
       configuration.resolved_render_mode.healthy?(
         command: configuration.send(:resolved_render_command),
@@ -84,9 +101,11 @@ module ReactEmailRails
 
     def instrument(**metadata)
       ActiveSupport::Notifications.instrument("render.react-email-rails", **metadata) do |payload|
-        yield.tap do |rendered|
-          payload[:html_bytes] = rendered.html.bytesize
-          payload[:warnings] = rendered.warnings if rendered.warnings.present?
+        yield.tap do |result|
+          next unless result.respond_to?(:html)
+
+          payload[:html_bytes] = result.html.bytesize
+          payload[:warnings] = result.warnings if result.warnings.present?
         end
       end
     end

@@ -10,9 +10,12 @@ class ReactEmailRails::RenderModes::Subprocess
 
   # Payload-agnostic transport: the caller builds and serializes the payload.
   # `label` identifies the render in error messages (component name or document type).
-  def initialize(payload:, label:)
+  # `response` selects how the renderer's reply is interpreted: `:email` builds a
+  # RenderedEmail (render/compose), `:document` returns the parsed document (parse).
+  def initialize(payload:, label:, response: :email)
     @payload = payload
     @label = label
+    @response = response
   end
 
   def render
@@ -21,15 +24,15 @@ class ReactEmailRails::RenderModes::Subprocess
 
   private
 
-  attr_reader(:payload, :label)
+  attr_reader(:payload, :label, :response)
 
   def run
     result = capture(payload_json)
     raise(render_error(error_message(result.stderr, result.status))) unless result.status.success?
 
     body = JSON.parse(result.stdout)
-    validate_response!(body)
-    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s, warnings: warnings_from(body))
+    validate_metadata!(body)
+    build_result(body)
   rescue JSON::ParserError => e
     raise(render_error("render process returned invalid JSON: #{e.message}"))
   rescue KeyError => e
@@ -75,12 +78,31 @@ class ReactEmailRails::RenderModes::Subprocess
     raise(render_error("email bundle not found at #{bundle_path.inspect}; run react-email-rails-build before rendering React emails"))
   end
 
-  def validate_response!(body)
-    raise(render_error(ReactEmailRails::RenderProtocol.mismatch_message(body))) unless ReactEmailRails::RenderProtocol.compatible_metadata?(body)
+  def validate_metadata!(body)
+    return if ReactEmailRails::RenderProtocol.compatible_metadata?(body)
 
+    raise(render_error(ReactEmailRails::RenderProtocol.mismatch_message(body)))
+  end
+
+  def build_result(body)
+    response == :document ? build_document(body) : build_rendered_email(body)
+  end
+
+  def build_rendered_email(body)
     raise(KeyError.new(key: "html")) unless body.key?("html")
     raise(render_error("render process returned an invalid response: html must be a string")) unless body["html"].is_a?(String)
     raise(render_error("render process returned an invalid response: text must be a string")) if body.key?("text") && !body["text"].is_a?(String)
+
+    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s, warnings: warnings_from(body))
+  end
+
+  def build_document(body)
+    raise(KeyError.new(key: "document")) unless body.key?("document")
+
+    document = body.fetch("document")
+    raise(render_error("parse process returned an invalid response: document must be an object")) unless document.is_a?(Hash)
+
+    document
   end
 
   def warnings_from(body)
