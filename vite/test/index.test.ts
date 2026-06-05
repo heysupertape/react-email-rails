@@ -75,7 +75,7 @@ describe("renderEmail", () => {
 
   it("throws when the component is not found", async () => {
     await expect(renderEmail({ component: "nope/missing" }, {})).rejects.toThrow(
-      "component not found",
+      "component not found: nope/missing",
     )
   })
 })
@@ -188,7 +188,8 @@ describe("reactEmailRails plugin", () => {
     const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')
-    expect(source).toContain('const extensions = [".tsx",".jsx"]')
+    expect(source).toContain("buildRegistry(")
+    expect(source).toContain('[".tsx",".jsx"], "/app/javascript/emails/")')
     expect(source).toContain("export const run")
   })
 
@@ -339,7 +340,7 @@ describe("reactEmailRails plugin", () => {
     )
     expect(source).toContain('import { generateJSON } from "@tiptap/html"')
     expect(source).toContain('"/app/javascript/documents/**/*{.tsx,.ts}"')
-    expect(source).toContain('const documentExtensions = [".tsx",".ts"]')
+    expect(source).toContain('[".tsx",".ts"], "/app/javascript/documents/")')
     expect(source).toContain(
       "export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: createParseDocument(generateJSON) })",
     )
@@ -392,7 +393,8 @@ describe("reactEmailRails plugin", () => {
     const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')
-    expect(source).toContain('const extensions = [".tsx",".jsx"]')
+    expect(source).toContain("buildRegistry(")
+    expect(source).toContain('[".tsx",".jsx"], "/app/javascript/emails/")')
   })
 
   it("matches longer overlapping extensions before shorter suffixes", () => {
@@ -400,7 +402,7 @@ describe("reactEmailRails plugin", () => {
     const source = loadVirtualServer(plugin)
 
     expect(source).toContain('"/app/javascript/emails/**/*{.email.tsx,.tsx}"')
-    expect(source).toContain('const extensions = [".email.tsx",".tsx"]')
+    expect(source).toContain('[".email.tsx",".tsx"], "/app/javascript/emails/")')
   })
 })
 

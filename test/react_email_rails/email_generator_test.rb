@@ -63,6 +63,19 @@ class ReactEmailRails::EmailGeneratorTest < Rails::Generators::TestCase
     assert_no_file("app/javascript/emails/account_mailer/created.tsx")
   end
 
+  test("loads without requiring the main gem entrypoint first") do
+    stdout, stderr, status = Open3.capture3(
+      RbConfig.ruby,
+      "-Ilib",
+      "-e",
+      'require "rails/generators"; require "generators/react_email_rails/email_generator"; puts ReactEmailRails::Generators::EmailGenerator::CONFIG_BIN',
+      chdir: File.expand_path("../..", __dir__),
+    )
+
+    assert(status.success?, stderr)
+    assert_equal("node_modules/.bin/react-email-rails-config", stdout.strip)
+  end
+
   test("allows explicitly overriding the component path and extension") do
     run_generator(
       [
@@ -84,13 +97,5 @@ class ReactEmailRails::EmailGeneratorTest < Rails::Generators::TestCase
     assert_file("app/mailers/account_mailer.rb")
     assert_no_file("test/mailers/account_mailer_test.rb")
     assert_no_file("test/mailers/previews/account_mailer_preview.rb")
-  end
-
-  private
-
-  def write_destination_file(path, content)
-    full_path = File.join(destination_root, path)
-    FileUtils.mkdir_p(File.dirname(full_path))
-    File.write(full_path, content)
   end
 end

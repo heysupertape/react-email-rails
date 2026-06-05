@@ -1,15 +1,6 @@
 require("test_helper")
 
 class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
-  RUBY = RbConfig.ruby
-  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
-
-  ECHO_INPUT = [
-    RUBY,
-    "-e",
-    "require \"json\"; $stdout.write(JSON.generate(html: $stdin.read, text: \"\", #{RENDER_METADATA}))",
-  ].freeze
-
   RENDER_FIXED = [
     RUBY,
     "-e",

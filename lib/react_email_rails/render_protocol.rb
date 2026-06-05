@@ -1,8 +1,15 @@
+require("json")
+
 module ReactEmailRails
   RENDER_PROTOCOL_VERSION = 3
 
   module RenderProtocol
     extend(self)
+
+    # Callers keep their own rescue to also cover failures obtaining the result.
+    def healthy_result?(result)
+      result.status.success? && compatible_response?(JSON.parse(result.stdout))
+    end
 
     def compatible_response?(body)
       body["ok"] == true && compatible_metadata?(body)

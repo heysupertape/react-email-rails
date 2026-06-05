@@ -2,6 +2,7 @@
 set -e
 
 cd "$(dirname "$0")/.."
+ruby scripts/check_version_sync.rb
 bundle exec rake
 
 cd vite

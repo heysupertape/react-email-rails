@@ -43,14 +43,12 @@ export type ParseDocumentRequest = {
 // A document node type that rendered to nothing, with how many times it occurred.
 export type DroppedNode = { type: string; count: number }
 
-// A render result plus any non-fatal warnings (document nodes dropped because no
-// extension rendered them). Component renders never carry warnings.
+// A render result plus non-fatal warnings (dropped document nodes); component renders carry none.
 export type RenderResult = RenderedEmail & { warnings?: DroppedNode[] }
 
 export type ParseResult = { document: unknown }
 
-// Injected by the generated server module when documents are enabled, so `serve`
-// renders documents without importing the editor module or its peer types.
+// Injected by the generated server module so `serve` renders documents without importing the editor module.
 export type DocumentSupport<Registry = unknown> = {
   registry: Registry
   compose: (request: RenderDocumentRequest, registry: Registry) => Promise<RenderResult>
@@ -70,6 +68,21 @@ export type EmailRenderOptions = {
 export function toComponentName(globPath: string, root: string, extension: string): string {
   const start = globPath.lastIndexOf(root) + root.length
   return globPath.slice(start, globPath.length - extension.length)
+}
+
+// Map glob results to a component-name registry (used for both email and document registries).
+export function buildRegistry(
+  modules: EmailRegistry,
+  extensions: string[],
+  root: string,
+): EmailRegistry {
+  const registry: EmailRegistry = Object.create(null)
+  for (const [path, loader] of Object.entries(modules)) {
+    const extension =
+      extensions.find((ext) => path.endsWith(ext)) ?? path.slice(path.lastIndexOf("."))
+    registry[toComponentName(path, root, extension)] = loader
+  }
+  return registry
 }
 
 export async function renderEmail(
@@ -93,15 +106,14 @@ function isDocumentRequest(request: unknown): request is RenderDocumentRequest {
   return (
     request !== null &&
     typeof request === "object" &&
-    (request as { kind?: unknown }).kind === "document"
+    "kind" in request &&
+    request.kind === "document"
   )
 }
 
 function isParseRequest(request: unknown): request is ParseDocumentRequest {
   return (
-    request !== null &&
-    typeof request === "object" &&
-    (request as { kind?: unknown }).kind === "parse"
+    request !== null && typeof request === "object" && "kind" in request && request.kind === "parse"
   )
 }
 
@@ -159,14 +171,16 @@ export async function serve<Registry = unknown>(
   }
 }
 
-// Reserve stdout for the JSON render protocol. Stray writes from email components
-// or their dependencies — including console.log, which Node routes through
-// process.stdout.write — are diverted to stderr so they cannot corrupt or desync
-// a response frame. Returns the writer to use for protocol output.
+// Reserve stdout for the JSON render protocol: stray writes (e.g. console.log, which Node
+// routes through process.stdout.write) are diverted to stderr so they can't corrupt a frame.
+// Returns the writer to use for protocol output.
 function isolateStdout(): (chunk: string) => boolean {
   const protocolWrite = process.stdout.write.bind(process.stdout)
-  process.stdout.write = ((chunk: string | Uint8Array): boolean =>
-    process.stderr.write(chunk)) as typeof process.stdout.write
+  // Forward encoding/callback (and the function-as-second-arg overload), not just chunk.
+  process.stdout.write = ((chunk, encoding, callback) =>
+    typeof encoding === "function"
+      ? process.stderr.write(chunk, encoding)
+      : process.stderr.write(chunk, encoding, callback)) as typeof process.stdout.write
   return (chunk) => protocolWrite(chunk)
 }
 

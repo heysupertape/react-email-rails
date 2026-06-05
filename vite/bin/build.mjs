@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 import { createBuilder } from "vite"
-import { fail, isolatedViteConfig, loadReactEmailRailsConfig } from "./shared.mjs"
-import { RENDER_PROTOCOL_VERSION, VERSION } from "../dist/version.js"
+import {
+  exitIfHealthCheck,
+  fail,
+  isolatedViteConfig,
+  loadReactEmailRailsConfig,
+} from "./shared.mjs"
 
-if (process.argv.includes("--health")) {
-  process.stdout.write(
-    JSON.stringify({ ok: true, protocolVersion: RENDER_PROTOCOL_VERSION, packageVersion: VERSION }),
-  )
-  process.exit(0)
-}
+exitIfHealthCheck()
 
 const args = process.argv.slice(2)
 const readOption = (long, short) => {
@@ -52,9 +51,8 @@ const { userConfig, plugin, vite } = await loadReactEmailRailsConfig({
   configLoader,
 })
 
-// Build production emails with the same isolation principle as the dev renderer:
-// keep component resolution and transforms, but leave unrelated app plugins out
-// of the email environment so client/global plugin hooks cannot break SSR output.
+// Same isolation as the dev renderer: keep component resolve/transforms but leave unrelated
+// app plugins out of the email environment so their hooks can't break SSR output.
 const builder = await createBuilder(
   isolatedViteConfig(userConfig, vite, {
     root: root ?? userConfig.root,

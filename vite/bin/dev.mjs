@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 import { createServer, isRunnableDevEnvironment } from "vite"
-import { fail, isolatedViteConfig, loadReactEmailRailsConfig } from "./shared.mjs"
-import { RENDER_PROTOCOL_VERSION, VERSION } from "../dist/version.js"
+import {
+  exitIfHealthCheck,
+  fail,
+  isolatedViteConfig,
+  loadReactEmailRailsConfig,
+} from "./shared.mjs"
 
-if (process.argv.includes("--health")) {
-  process.stdout.write(
-    JSON.stringify({ ok: true, protocolVersion: RENDER_PROTOCOL_VERSION, packageVersion: VERSION }),
-  )
-  process.exit(0)
-}
+exitIfHealthCheck()
 
 const toStderr = (message) => process.stderr.write(`${message}\n`)
 const logger = {
@@ -39,9 +38,7 @@ const { userConfig, plugin, vite } = await loadReactEmailRailsConfig({
   mode: "development",
 })
 
-// Forward config that affects how components resolve and compile (but not the
-// host's dev-server plugins, which have global side effects), so dev rendering
-// stays close to the production email bundle.
+// Forward only component resolve/compile config, so dev rendering stays close to the build.
 const server = await createServer(
   isolatedViteConfig(userConfig, vite, {
     configFile: false,
@@ -53,8 +50,7 @@ const server = await createServer(
   }),
 )
 
-// Render through the same `email` environment the production build uses, so dev
-// and build resolve and compile components identically.
+// Render through the same `email` environment as the production build, so the two match.
 const environment = server.environments.email
 if (!isRunnableDevEnvironment(environment)) {
   await server.close()
@@ -63,6 +59,7 @@ if (!isRunnableDevEnvironment(environment)) {
 
 try {
   const { run } = await environment.runner.import("virtual:react-email-rails/server")
+  // Restore before run(): serve() re-isolates stdout with its own protocol writer.
   restoreStdout()
   await run()
 } finally {

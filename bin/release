@@ -3,6 +3,7 @@ require("open3")
 require("json")
 require("rubygems")
 require("shellwords")
+require_relative("../scripts/changelog")
 
 USAGE = "Usage: bin/release"
 
@@ -43,10 +44,10 @@ package_version = package_json.fetch("version")
 abort("#{release_ref} vite/package.json version #{package_version.inspect} does not match #{version.inspect}") unless package_version == version
 
 changelog = run("git", "show", "#{release_ref}:CHANGELOG.md", capture: true)
-abort("#{release_ref} CHANGELOG.md is missing a ## #{version} section") unless changelog.match?(/^## #{Regexp.escape(version)}$/)
-release_notes_match = changelog.match(/^## #{Regexp.escape(version)}\n\n(?<notes>.*?)(?=\n## |\z)/m)
-if release_notes_match &&
-    (release_notes_match[:notes].strip.empty? || release_notes_match[:notes].match?(/\b(TODO|TBD)\b/i))
+case Changelog.notes_for(changelog, version).last
+when :missing
+  abort("#{release_ref} CHANGELOG.md is missing a ## #{version} section")
+when :empty
   abort("#{release_ref} CHANGELOG.md section ## #{version} needs release notes before publishing")
 end
 
@@ -61,23 +62,25 @@ versions = run("git", "tag", "--list", "v[0-9]*.[0-9]*.[0-9]*", capture: true)
   .lines
   .filter_map { |line| line.strip[/\Av(\d+\.\d+\.\d+)\z/, 1] }
   .map { |tag_version| Gem::Version.new(tag_version) }
-previous_version = versions.select { |tag_version| tag_version < Gem::Version.new(version) }.max
+new_version = Gem::Version.new(version)
+previous_version = versions.select { |tag_version| tag_version < new_version }.max
 latest_version = versions.max
 
-if latest_version && Gem::Version.new(version) <= latest_version
+if latest_version && new_version <= latest_version
   abort("#{tag} must be greater than latest release v#{latest_version}")
 end
 
 release_type =
   if previous_version.nil?
     "initial"
-  elsif Gem::Version.new(version).segments[0] > previous_version.segments[0]
+  elsif new_version.segments[0] > previous_version.segments[0]
     "major"
-  elsif Gem::Version.new(version).segments[1] > previous_version.segments[1]
+  elsif new_version.segments[1] > previous_version.segments[1]
     "minor"
-  elsif Gem::Version.new(version).segments[2] > previous_version.segments[2]
+  elsif new_version.segments[2] > previous_version.segments[2]
     "patch"
   else
+    # Unreachable given the version > latest check above; kept as a defensive guard.
     abort("Could not infer release type from v#{previous_version} to #{tag}")
   end
 

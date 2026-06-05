@@ -50,7 +50,7 @@ class ReactEmailRails::RenderModes::Subprocess::CommandRunner
 
   def terminate_process(signal, pid)
     Process.kill(signal, -pid)
-  rescue Errno::ESRCH
+  rescue Errno::ESRCH, Errno::EPERM
     nil
   end
 end

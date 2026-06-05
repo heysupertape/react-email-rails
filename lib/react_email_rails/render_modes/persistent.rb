@@ -8,20 +8,18 @@ class ReactEmailRails::RenderModes::Persistent < ReactEmailRails::RenderModes::S
   private
 
   def capture(input)
-    CommandRunner.capture(
-      command,
-      input:,
-      timeout: render_timeout,
-      max_requests: render_process_max_requests,
-    )
-  rescue Timeout::Error
-    raise(render_error("render process timed out after #{render_timeout}s"))
-  rescue Errno::ENOENT
-    raise(render_error("render command not found: #{command.inspect}"))
+    with_capture_rescues do
+      CommandRunner.capture(
+        command,
+        input:,
+        timeout: render_timeout,
+        max_requests: render_process_max_requests,
+      )
+    end
   end
 
   def render_process_max_requests
-    ReactEmailRails.configuration.send(:render_process_max_requests)
+    ReactEmailRails.configuration.render_process_max_requests
   end
 end
 

@@ -251,8 +251,8 @@ describe("react-email-rails-build", () => {
 
     await execFile("node", [join(pkgRoot, "bin/build.mjs")], { cwd: root })
 
-    // The output is a directory (emails.js + lazily-split chunks); copy it all
-    // somewhere without node_modules to prove tiptap/editor/prosemirror are inlined.
+    // Copy the whole output dir (emails.js + chunks) somewhere without node_modules to prove
+    // tiptap/editor/prosemirror are inlined.
     cpSync(join(root, "tmp/react-email-rails"), isolated, { recursive: true })
     const isolatedBundlePath = join(isolated, "emails.js")
 

@@ -4,9 +4,16 @@ import { EmailTheming } from "@react-email/editor/plugins"
 import { getSchema, resolveExtensions, type Extensions } from "@tiptap/core"
 import type { Editor } from "@tiptap/core"
 
-import type { DroppedNode, ParseResult, RenderResult } from "./runtime.js"
+import type {
+  DroppedNode,
+  ParseDocumentRequest,
+  ParseResult,
+  RenderDocumentRequest,
+  RenderResult,
+} from "./runtime.js"
 
-export type { DroppedNode }
+// Re-exported from runtime.ts (the single source) to keep react-email-rails/document's surface.
+export type { DroppedNode, ParseDocumentRequest, RenderDocumentRequest }
 
 export type DocumentRenderer = {
   buildExtensions: (context: unknown) => Extensions
@@ -22,9 +29,8 @@ const STRUCTURAL_NODE_TYPES: ReadonlySet<string> = new Set(
     .map((extension) => extension.name),
 )
 
-// composeReactEmail renders a node as null when no extension matches its type or
-// the match is not an EmailNode. Mirror that predicate over the document so
-// warnings report the silent case: an in-schema node with no email renderer.
+// composeReactEmail renders a node as null when no extension matches or the match isn't an
+// EmailNode; mirror that here so warnings catch the silent case (in-schema node, no email renderer).
 function collectDroppedNodes(document: unknown, extensions: Extensions): DroppedNode[] {
   const byName = new Map<string, Extensions[number]>()
   for (const extension of extensions) byName.set(extension.name, extension)
@@ -52,21 +58,6 @@ function collectDroppedNodes(document: unknown, extensions: Extensions): Dropped
 
 export type DocumentLoader = DocumentRenderer | (() => Promise<DocumentRenderer>)
 export type DocumentRegistry = Record<string, DocumentLoader>
-
-export type RenderDocumentRequest = {
-  kind: "document"
-  type: string
-  document: unknown
-  context?: unknown
-  preview?: string | null
-}
-
-export type ParseDocumentRequest = {
-  kind: "parse"
-  type: string
-  html: string
-  context?: unknown
-}
 
 type GenerateJSON = (html: string, extensions: Extensions) => unknown
 

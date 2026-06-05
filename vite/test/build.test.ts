@@ -18,9 +18,8 @@ afterAll(() => {
 type Extra = { config?: InlineConfig; files?: Record<string, string> }
 type BuildResult = { root: string; resolveCalls: number; loadCalls: number }
 
-// Build a throwaway app through the plugin and return its root. The fixture is
-// rooted under node_modules so React and @react-email/render resolve from the
-// package's own dependencies, and so the scratch output stays gitignored.
+// Build a throwaway app through the plugin and return its root. Rooted under node_modules so
+// React/@react-email/render resolve from the package's deps and the scratch output stays gitignored.
 async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Promise<BuildResult> {
   const root = mkdtempSync(join(pkgRoot, "node_modules", ".rer-build-"))
   fixtures.push(root)
@@ -31,8 +30,7 @@ async function buildFixture(options?: ReactEmailRailsOptions, extra?: Extra): Pr
     `<!doctype html><html><body><script type="module" src="/main.js"></script></body></html>`,
   )
   writeFileSync(join(root, "main.js"), "export const ok = true\n")
-  // Plain createElement keeps the fixture free of JSX-transform config, so the
-  // test stays focused on build orchestration rather than the host's JSX setup.
+  // Plain createElement avoids JSX-transform config, keeping the test on build orchestration.
   writeFileSync(
     join(root, "app/javascript/emails/account_mailer/created.tsx"),
     'import "email-only-missing-module"\n' +

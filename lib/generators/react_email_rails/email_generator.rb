@@ -2,11 +2,14 @@ require("rails/generators/named_base")
 require("json")
 require("open3")
 require("timeout")
+require_relative("vite_config_files")
 
 module ReactEmailRails; end
 module ReactEmailRails::Generators; end
 
 class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
+  CONFIG_BIN = "node_modules/.bin/react-email-rails-config"
+
   source_root(File.expand_path("templates/email", __dir__))
 
   argument(:actions, type: :array, default: [], banner: "method method")
@@ -80,7 +83,7 @@ class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
   end
 
   def component_base_path
-    File.join(emails_path, "#{file_path}_mailer")
+    File.join(emails_path, mailer_file_path)
   end
 
   def emails_path
@@ -131,47 +134,50 @@ class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
 
   def vite_config_command
     [
-      "node_modules/.bin/react-email-rails-config",
-      "node_modules/.bin/react-email-rails-config.cmd",
+      CONFIG_BIN,
+      "#{CONFIG_BIN}.cmd",
     ].find { |path| File.exist?(File.join(destination_root, path)) }
   end
+
+  # The reactEmailRails({ ... }) plugin call, up to the option key being scanned for.
+  PLUGIN_OPENING = /reactEmailRails\s*\(\s*\{.*?/m
 
   def emails_path_from_vite_config
     source = vite_config_source
     return unless source
 
-    source[
-      /reactEmailRails\s*\(\s*\{.*?emails:\s*["']([^"']+)["']/m,
-      1,
-    ] || source[
-      /reactEmailRails\s*\(\s*\{.*?emails:\s*\{.*?path:\s*["']([^"']+)["']/m,
-      1,
-    ]
+    first_capture(
+      source,
+      /#{PLUGIN_OPENING}emails:\s*["']([^"']+)["']/m,
+      /#{PLUGIN_OPENING}emails:\s*\{.*?path:\s*["']([^"']+)["']/m,
+    )
   end
 
   def extension_from_vite_config
     source = vite_config_source
     return unless source
 
-    source[
-      /reactEmailRails\s*\(\s*\{.*?emails:\s*\{.*?extension:\s*["']([^"']+)["']/m,
-      1,
-    ] || source[
-      /reactEmailRails\s*\(\s*\{.*?emails:\s*\{.*?extension:\s*\[\s*["']([^"']+)["']/m,
-      1,
-    ]
+    first_capture(
+      source,
+      /#{PLUGIN_OPENING}emails:\s*\{.*?extension:\s*["']([^"']+)["']/m,
+      /#{PLUGIN_OPENING}emails:\s*\{.*?extension:\s*\[\s*["']([^"']+)["']/m,
+    )
+  end
+
+  # First capture-group match across an ordered list of patterns, or nil.
+  def first_capture(source, *patterns)
+    patterns.each do |pattern|
+      match = source[pattern, 1]
+      return match if match
+    end
+    nil
   end
 
   def vite_config_source
     @vite_config_source ||= begin
-      path = [
-        "vite.config.ts",
-        "vite.config.mts",
-        "vite.config.js",
-        "vite.config.mjs",
-        "vite.config.cts",
-        "vite.config.cjs",
-      ].find { |candidate| File.exist?(File.join(destination_root, candidate)) }
+      path = ReactEmailRails::Generators::VITE_CONFIG_FILES.find do |candidate|
+        File.exist?(File.join(destination_root, candidate))
+      end
 
       File.read(File.join(destination_root, path)) if path
     end

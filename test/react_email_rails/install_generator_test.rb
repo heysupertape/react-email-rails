@@ -55,12 +55,4 @@ class ReactEmailRails::InstallGeneratorTest < Rails::Generators::TestCase
 
     assert_file("package.json", /"react-email-rails"/)
   end
-
-  private
-
-  def write_destination_file(path, content)
-    full_path = File.join(destination_root, path)
-    FileUtils.mkdir_p(File.dirname(full_path))
-    File.write(full_path, content)
-  end
 end
