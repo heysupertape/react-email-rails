@@ -339,10 +339,12 @@ describe("reactEmailRails plugin", () => {
       'import { composeDocument, createParseDocument } from "react-email-rails/document"',
     )
     expect(source).toContain('import { generateJSON } from "@tiptap/html"')
+    // marked is installed in this workspace, so the markdown renderer is wired in too.
+    expect(source).toContain('import { marked } from "marked"')
     expect(source).toContain('"/app/javascript/documents/**/*{.tsx,.ts}"')
     expect(source).toContain('[".tsx",".ts"], "/app/javascript/documents/")')
     expect(source).toContain(
-      "export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: createParseDocument(generateJSON) })",
+      "export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: createParseDocument(generateJSON, (markdown) => marked.parse(markdown)) })",
     )
     // The email registry is still built exactly as before.
     expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')

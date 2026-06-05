@@ -44,7 +44,6 @@ React Email Rails automatically renders both HTML and plain-text versions from t
 - Vite 7 or 8
 - React 18 or 19
 - `@react-email/render` 2.x
-- For [rendering editor documents](#editor) (optional): `@react-email/editor` 1.5+ and `@tiptap/core` 3.x
 
 > We recommend [rails_vite](https://github.com/skryukov/rails_vite/) for Vite with Rails.
 
@@ -311,10 +310,16 @@ Install the editor packages:
 npm i @react-email/editor @tiptap/core
 ```
 
-To also parse HTML into documents with [`parse`](#parsing-html-into-a-document), add `@tiptap/html` and its server DOM, `happy-dom`:
+To also parse HTML into documents with [`parse`](#parsing-html-or-markdown-into-a-document), add `@tiptap/html` and its server DOM, `happy-dom`:
 
 ```sh
 npm i @tiptap/html happy-dom
+```
+
+To parse Markdown as well, add [`marked`](https://marked.js.org) — it converts Markdown to HTML, which then runs through the same parser:
+
+```sh
+npm i marked
 ```
 
 Enable the `documents` option in your Vite config:
@@ -342,7 +347,6 @@ A document doesn't carry the editor configuration it was authored with, so a hea
 import { StarterKit } from "@react-email/editor/extensions"
 import { EmailTheming } from "@react-email/editor/plugins"
 
-// Required: the Tiptap extensions the document was authored with.
 export function buildExtensions() {
   return [StarterKit, EmailTheming]
 }
@@ -368,15 +372,12 @@ export function buildExtensions(context) {
   return [StarterKit, EmailTheming]
 }
 
-// Inject a branded header after the persisted theme node, wherever it sits.
 export function transformDocument(document, context) {
   const header = {
     type: "heading",
     attrs: { level: 1 },
     content: [{ type: "text", text: context.brandName }],
   }
-  // Find globalContent and insert after it, rather than assuming a position, so
-  // the theme node is preserved.
   const themeIndex = document.content.findIndex((node) => node.type === "globalContent")
   const at = themeIndex + 1
   return {
@@ -403,9 +404,9 @@ broadcast = Broadcast.find(params[:id])
 
 rendered = ReactEmailRails.compose(
   type: "broadcast",
-  document: broadcast.body,          # a Hash in Tiptap's shape, e.g. from a jsonb column
+  document: broadcast.body,
   context: { brand_name: "Acme", preview_text: broadcast.subject },
-  preview: broadcast.subject,        # optional; falls back to getPreview(context)
+  preview: broadcast.subject,
 )
 
 rendered.html # => "<!DOCTYPE html>..."
@@ -414,24 +415,24 @@ rendered.text # => "ACME\n\n..."
 
 It returns the same `RenderedEmail` (`html`/`text`) as `render`, runs through the same [render modes](#render-modes), and raises `ReactEmailRails::RenderError` on failure. Documents don't go through Action Mailer — broadcasts and the like usually have their own delivery path — so deliver `rendered.html`/`rendered.text` however your app sends mail.
 
-**The document is a `Hash`.** You pass and store it as a plain Ruby `Hash` with string keys — what a jsonb column hands back, and what [`parse`](#parsing-html-into-a-document) returns. "Tiptap JSON" names the document's *shape* (and the format it's serialized to over the wire to the renderer), not the Ruby type; `compose` accepts any object that responds to `as_json`, but a `Hash` is the norm.
+**The document is a `Hash`.** You pass and store it as a plain Ruby `Hash` with string keys — what a jsonb column hands back, and what [`parse`](#parsing-html-or-markdown-into-a-document) returns. "Tiptap JSON" names the document's *shape* (and the format it's serialized to over the wire to the renderer), not the Ruby type; `compose` accepts any object that responds to `as_json`, but a `Hash` is the norm.
 
 **Keys:** the document's keys (`type`, `attrs`, `content`, `marks`, node names, `globalContent`) are structural and **passed through verbatim** — never transformed. Only `context` is key-transformed, camelized exactly like component props (so `brand_name` arrives as `brandName`, per [`transform_props`](#prop-transformation)).
 
 `render_options` does not apply to documents; `composeReactEmail` controls its own rendering.
 
-### Parsing HTML into a Document
+### Parsing HTML or Markdown into a Document
 
 `ReactEmailRails.parse` converts semantic HTML into the same document `Hash` shape the editor stores, using the selected renderer's extensions. This needs the `@tiptap/html` and `happy-dom` packages (see [Setup](#setup)).
 
 ```ruby
 document = ReactEmailRails.parse(
-  type: "broadcast",                 # the same renderer type compose uses
-  html: params[:body_html],          # the HTML the caller sent
-  context: { brand_name: "Acme" },   # optional; reaches buildExtensions, like compose
+  type: "broadcast",
+  html: params[:body_html],
+  context: { brand_name: "Acme" },
 )
 
-broadcast.update!(body: document)    # persist the Hash (e.g. to a jsonb column)
+broadcast.update!(body: document)
 ```
 
 Later, render the stored document like any other:
@@ -442,10 +443,26 @@ rendered = ReactEmailRails.compose(type: "broadcast", document: broadcast.body)
 
 `parse` returns a plain Ruby `Hash` with string keys, normalized through the renderer's schema. It uses the same [render modes](#render-modes) as `compose` and raises `ReactEmailRails::RenderError` on failure. `context` is key-transformed like component props; the HTML is sent verbatim.
 
+#### Markdown
+
+Pass `markdown:` in place of `html:` to parse Markdown — useful when the content comes from an LLM or another tool that emits Markdown more readily than HTML. It's converted to HTML with [`marked`](https://marked.js.org) and run through the same parse path, so it needs `marked` installed alongside the HTML peers (see [Setup](#setup)).
+
+```ruby
+document = ReactEmailRails.parse(
+  type: "broadcast",
+  markdown: "# Welcome\n\nThanks for signing up, **Ada**.",
+  context: { brand_name: "Acme" },
+)
+```
+
+Pass exactly one of `html:` or `markdown:` — passing both, or neither, raises `ArgumentError`.
+
+Markdown is a lower-friction *input*, not a wider one. It expresses less than HTML — headings, paragraphs, emphasis, links, lists, blockquotes, code, images, and rules — so it adds no new node types. Markdown that maps to nodes the renderer's extensions don't define (such as a GFM table without a table extension) is dropped or flattened, the same as the equivalent HTML.
+
 What this means in practice:
 
 - HTML maps to a node only when an extension defines how to parse it. Unknown elements, inline styles, and classes may be dropped or flattened.
-- Editor-only constructs such as custom email nodes and the persisted `globalContent` theme node do not round-trip from plain HTML.
+- Editor-only constructs such as custom email nodes and the persisted `globalContent` theme node do not round-trip from plain HTML or Markdown.
 - If you already have the document `Hash`, pass it to `compose` directly.
 
 ### Debugging Dropped Content

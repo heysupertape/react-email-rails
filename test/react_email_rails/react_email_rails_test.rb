@@ -249,10 +249,43 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     assert_equal("parse", document.fetch("kind"))
     assert_equal("broadcast", document.fetch("type"))
     assert_equal("<h1>Hello</h1>", document.fetch("html"))
+    assert_nil(document["markdown"])
     assert_equal(
       { "brandName" => "Acme", "nestedThing" => { "logoUrl" => "https://example.com/logo.png" } },
       document.fetch("context"),
     )
+  end
+
+  test("parse sends a parse payload with the markdown verbatim and the context camelized") do
+    document = with_react_email_internals(render_command: PARSE_ECHO) do
+      ReactEmailRails.parse(
+        type: "broadcast",
+        markdown: "# Hello",
+        context: { brand_name: "Acme" },
+      )
+    end
+
+    assert_equal("parse", document.fetch("kind"))
+    assert_equal("broadcast", document.fetch("type"))
+    assert_equal("# Hello", document.fetch("markdown"))
+    assert_nil(document["html"])
+    assert_equal({ "brandName" => "Acme" }, document.fetch("context"))
+  end
+
+  test("parse raises when both html and markdown are given") do
+    error = assert_raises(ArgumentError) do
+      ReactEmailRails.parse(type: "broadcast", html: "<p>Hi</p>", markdown: "Hi")
+    end
+
+    assert_match(/only one of html: or markdown:/, error.message)
+  end
+
+  test("parse raises when neither html nor markdown is given") do
+    error = assert_raises(ArgumentError) do
+      ReactEmailRails.parse(type: "broadcast")
+    end
+
+    assert_match(/requires html: or markdown:/, error.message)
   end
 
   test("parse returns the parsed document") do

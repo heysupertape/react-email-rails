@@ -33,10 +33,12 @@ export type RenderDocumentRequest = {
   preview?: string | null
 }
 
+// Exactly one of `html` or `markdown` is set.
 export type ParseDocumentRequest = {
   kind: "parse"
   type: string
-  html: string
+  html?: string
+  markdown?: string
   context?: unknown
 }
 

@@ -60,6 +60,13 @@ export type DocumentLoader = DocumentRenderer | (() => Promise<DocumentRenderer>
 export type DocumentRegistry = Record<string, DocumentLoader>
 
 type GenerateJSON = (html: string, extensions: Extensions) => unknown
+type RenderMarkdown = (markdown: string) => string | Promise<string>
+
+// Bound at build time by createParseDocument when the peers are bundled; lazy-loaded otherwise.
+type ParseDependencies = {
+  generateJSON?: GenerateJSON
+  renderMarkdown?: RenderMarkdown
+}
 
 async function resolveRenderer(
   type: string,
@@ -91,6 +98,44 @@ async function loadGenerateJSON(): Promise<GenerateJSON> {
   throw new Error(
     "@tiptap/html is missing the expected generateJSON export; check the installed version",
   )
+}
+
+async function loadRenderMarkdown(): Promise<RenderMarkdown> {
+  try {
+    const mod = (await import(/* @vite-ignore */ "marked")) as {
+      marked?: { parse?: (markdown: string) => string | Promise<string> }
+    }
+    const marked = mod.marked
+    if (marked && typeof marked.parse === "function") {
+      const parse = marked.parse.bind(marked)
+      return (markdown) => parse(markdown)
+    }
+  } catch (error) {
+    throw new Error(
+      `marked is required to parse Markdown documents; install it before calling parse with markdown (${error instanceof Error ? error.message : "module load failed"})`,
+    )
+  }
+
+  throw new Error("marked is missing the expected parse export; check the installed version")
+}
+
+// Both inputs converge on HTML: markdown is rendered first, then parsed like any HTML.
+async function resolveHtmlInput(
+  request: ParseDocumentRequest,
+  dependencies: ParseDependencies,
+): Promise<string> {
+  const hasHtml = request.html !== undefined
+  const hasMarkdown = request.markdown !== undefined
+  if (hasHtml === hasMarkdown) {
+    throw new Error("parse request must include exactly one of `html` or `markdown`")
+  }
+
+  if (hasMarkdown) {
+    const renderMarkdown = dependencies.renderMarkdown ?? (await loadRenderMarkdown())
+    return renderMarkdown(request.markdown as string)
+  }
+
+  return request.html as string
 }
 
 export async function composeDocument(
@@ -136,20 +181,24 @@ export async function composeDocument(
 export async function parseDocument(
   request: ParseDocumentRequest,
   registry: DocumentRegistry,
-  generateJSON?: GenerateJSON,
+  dependencies: ParseDependencies = {},
 ): Promise<ParseResult> {
-  const parseHTML = generateJSON ?? (await loadGenerateJSON())
   const renderer = await resolveRenderer(request.type, registry)
   const extensions = resolveExtensions(renderer.buildExtensions(request.context))
   const schema = getSchema(extensions)
 
-  const parsed = parseHTML(request.html, extensions)
+  const html = await resolveHtmlInput(request, dependencies)
+  const parseHTML = dependencies.generateJSON ?? (await loadGenerateJSON())
+  const parsed = parseHTML(html, extensions)
   const document = schema.nodeFromJSON(parsed).toJSON()
 
   return { document }
 }
 
-export function createParseDocument(generateJSON: GenerateJSON) {
+export function createParseDocument(generateJSON: GenerateJSON, renderMarkdown?: RenderMarkdown) {
+  // Omit renderMarkdown entirely when unset; exactOptionalPropertyTypes forbids passing `undefined`.
+  const dependencies: ParseDependencies =
+    renderMarkdown === undefined ? { generateJSON } : { generateJSON, renderMarkdown }
   return (request: ParseDocumentRequest, registry: DocumentRegistry): Promise<ParseResult> =>
-    parseDocument(request, registry, generateJSON)
+    parseDocument(request, registry, dependencies)
 }

@@ -3,8 +3,11 @@ import { EmailTheming } from "@react-email/editor/plugins"
 import { Node } from "@tiptap/core"
 import { describe, expect, it } from "vitest"
 
+import { marked } from "marked"
+
 import {
   composeDocument,
+  createParseDocument,
   type DocumentRegistry,
   type DocumentRenderer,
   parseDocument,
@@ -272,6 +275,88 @@ describe("parseDocument", () => {
     }
 
     await parseDocument(parse("broadcast", "<p>x</p>", { brand: "Acme" }), registry)
+
+    expect(seen).toEqual({ brand: "Acme" })
+  })
+
+  it("throws when neither html nor markdown is provided", async () => {
+    await expect(parseDocument({ kind: "parse", type: "broadcast" }, { broadcast })).rejects.toThrow(
+      "exactly one of",
+    )
+  })
+
+  it("throws when both html and markdown are provided", async () => {
+    await expect(
+      parseDocument({ kind: "parse", type: "broadcast", html: "<p>x</p>", markdown: "x" }, { broadcast }),
+    ).rejects.toThrow("exactly one of")
+  })
+})
+
+describe("parseDocument with markdown", () => {
+  function parse(type: string, markdown: string, context?: unknown) {
+    return {
+      kind: "parse" as const,
+      type,
+      markdown,
+      ...(context === undefined ? {} : { context }),
+    }
+  }
+
+  it("parses Markdown into an editor document (Tiptap JSON)", async () => {
+    const result = await parseDocument(parse("broadcast", "# Hello world\n\nBody copy"), { broadcast })
+
+    const document = result.document as JSONNode
+    expect(document.type).toBe("doc")
+    const types = (document.content ?? []).map((node) => node.type)
+    expect(types).toContain("heading")
+    expect(types).toContain("paragraph")
+  })
+
+  it("produces the same document as the equivalent HTML", async () => {
+    const fromMarkdown = await parseDocument(parse("broadcast", "# Headline\n\nBody"), { broadcast })
+    const fromHtml = await parseDocument(
+      { kind: "parse", type: "broadcast", html: "<h1>Headline</h1><p>Body</p>" },
+      { broadcast },
+    )
+
+    expect(fromMarkdown.document).toEqual(fromHtml.document)
+  })
+
+  it("renders Markdown emphasis into marks", async () => {
+    const result = await parseDocument(parse("broadcast", "A **bold** word"), { broadcast })
+
+    const fromMarkdown = await composeDocument(
+      { kind: "document", type: "broadcast", document: result.document },
+      { broadcast },
+    )
+
+    expect(fromMarkdown.html).toContain("bold")
+    expect(fromMarkdown.html).toMatch(/<strong|font-weight/i)
+  })
+
+  it("uses an injected markdown renderer (createParseDocument)", async () => {
+    const { generateJSON } = await import("@tiptap/html")
+    const renderMarkdown = (md: string) => marked.parse(md, { async: false })
+    const composedParse = createParseDocument(generateJSON, renderMarkdown)
+
+    const result = await composedParse(parse("broadcast", "# Injected"), { broadcast })
+
+    const document = result.document as JSONNode
+    expect((document.content ?? []).map((node) => node.type)).toContain("heading")
+  })
+
+  it("passes context to buildExtensions", async () => {
+    let seen: unknown
+    const registry: DocumentRegistry = {
+      broadcast: {
+        buildExtensions: (context) => {
+          seen = context
+          return [StarterKit, EmailTheming]
+        },
+      },
+    }
+
+    await parseDocument(parse("broadcast", "# Hi", { brand: "Acme" }), registry)
 
     expect(seen).toEqual({ brand: "Acme" })
   })

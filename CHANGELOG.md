@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- `ReactEmailRails.parse` now accepts `markdown:` as an alternative to `html:`. Markdown is converted to HTML and runs through the same extension-driven parse path, producing the same document `Hash` — handy for agent- or tool-generated content. Pass exactly one of `html:`/`markdown:`.
+- Add `marked` as an optional peer dependency, required only when calling `parse` with `markdown:`. HTML parsing and compose-only rendering do not require it.
+
 ## 0.3.0
 
 - Add `ReactEmailRails.parse` to convert semantic HTML into a canonical `@react-email/editor` document using a renderer's extensions.

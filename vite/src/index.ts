@@ -154,6 +154,8 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
           const lines = [`import { buildRegistry, serve } from "react-email-rails/runtime"`]
           const parserPeersAvailable =
             documentSource && optionalPeersAvailable(["@tiptap/html", "happy-dom"])
+          // Markdown parsing layers `marked` on top of the HTML parser peers.
+          const markdownPeerAvailable = parserPeersAvailable && optionalPeersAvailable(["marked"])
 
           if (documentSource) {
             lines.push(
@@ -161,7 +163,10 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
                 ? `import { composeDocument, createParseDocument } from "react-email-rails/document"`
                 : `import { composeDocument, parseDocument } from "react-email-rails/document"`,
             )
-            if (parserPeersAvailable) lines.push(`import { generateJSON } from "@tiptap/html"`)
+            if (parserPeersAvailable) {
+              lines.push(`import { generateJSON } from "@tiptap/html"`)
+              if (markdownPeerAvailable) lines.push(`import { marked } from "marked"`)
+            }
           }
 
           lines.push(
@@ -171,7 +176,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
           if (documentSource) {
             lines.push(
               `const documentRegistry = buildRegistry(import.meta.glob(${documentSource.globArg}), ${JSON.stringify(documentSource.extensions)}, ${JSON.stringify(documentSource.root)})`,
-              `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: ${parserPeersAvailable ? "createParseDocument(generateJSON)" : "parseDocument"} })`,
+              `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: ${parserPeersAvailable ? `createParseDocument(generateJSON${markdownPeerAvailable ? ", (markdown) => marked.parse(markdown)" : ""})` : "parseDocument"} })`,
             )
           } else {
             lines.push(`export const run = () => serve(registry)`)
