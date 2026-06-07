@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- `ReactEmailRails.parse` now neutralizes unsafe link/button URI schemes: hrefs whose scheme is not `http`, `https`, `mailto`, or `tel` (e.g. `javascript:`/`data:`) are blanked before they reach the document `Hash`. Scheme detection ignores the whitespace and control characters browsers strip when resolving a scheme, so case- and whitespace-obfuscated payloads are caught too.
+
 ## 0.4.0
 
 - `ReactEmailRails.parse` now accepts `markdown:` as an alternative to `html:`. Markdown is converted to HTML and runs through the same extension-driven parse path, producing the same document `Hash` — handy for agent- or tool-generated content. Pass exactly one of `html:`/`markdown:`.

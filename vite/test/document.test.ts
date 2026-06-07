@@ -368,3 +368,106 @@ describe("parseDocument with markdown", () => {
     expect(seen).toEqual({ brand: "Acme" })
   })
 })
+
+describe("parseDocument neutralizes unsafe URIs", () => {
+  function collectHrefs(value: unknown, out: string[] = []): string[] {
+    if (Array.isArray(value)) {
+      for (const item of value) collectHrefs(item, out)
+      return out
+    }
+    if (value === null || typeof value !== "object") return out
+
+    const node = value as { attrs?: { href?: unknown }; marks?: unknown; content?: unknown }
+    if (typeof node.attrs?.href === "string") out.push(node.attrs.href)
+    collectHrefs(node.marks, out)
+    collectHrefs(node.content, out)
+    return out
+  }
+
+  function html(type: string, source: string) {
+    return { kind: "parse" as const, type, html: source }
+  }
+
+  it("blanks a javascript: href from the html: input", async () => {
+    const result = await parseDocument(
+      html("broadcast", '<p><a href="javascript:alert(1)">click</a></p>'),
+      { broadcast },
+    )
+
+    expect(collectHrefs(result.document)).toEqual([""])
+  })
+
+  it("blanks a javascript: link from the markdown: input", async () => {
+    const result = await parseDocument(
+      { kind: "parse", type: "broadcast", markdown: "[click](javascript:alert(1))" },
+      { broadcast },
+    )
+
+    expect(collectHrefs(result.document)).toEqual([""])
+  })
+
+  it("blanks a data: href", async () => {
+    const result = await parseDocument(
+      html("broadcast", '<p><a href="data:text/html,<script>alert(1)</script>">x</a></p>'),
+      { broadcast },
+    )
+
+    expect(collectHrefs(result.document)).toEqual([""])
+  })
+
+  it("preserves safe schemes and scheme-less URLs", async () => {
+    const source =
+      "<p>" +
+      '<a href="https://example.com">a</a>' +
+      '<a href="mailto:a@b.com">b</a>' +
+      '<a href="tel:+15551234">c</a>' +
+      '<a href="/relative/path">d</a>' +
+      '<a href="#anchor">e</a>' +
+      "</p>"
+    const result = await parseDocument(html("broadcast", source), { broadcast })
+
+    expect(collectHrefs(result.document)).toEqual([
+      "https://example.com",
+      "mailto:a@b.com",
+      "tel:+15551234",
+      "/relative/path",
+      "#anchor",
+    ])
+  })
+
+  it("defangs case- and whitespace-obfuscated schemes", async () => {
+    const source =
+      "<p>" +
+      '<a href="JaVaScRiPt:alert(1)">a</a>' +
+      '<a href="  javascript:alert(1)">b</a>' +
+      '<a href="java\tscript:alert(1)">c</a>' +
+      "</p>"
+    const result = await parseDocument(html("broadcast", source), { broadcast })
+
+    expect(collectHrefs(result.document)).toEqual(["", "", ""])
+  })
+
+  it("defangs an entity-encoded colon that the parser decodes into a scheme", async () => {
+    const result = await parseDocument(
+      html("broadcast", '<p><a href="javascript&#58;alert(1)">x</a></p>'),
+      { broadcast },
+    )
+
+    expect(collectHrefs(result.document)).toEqual([""])
+  })
+
+  it("emits no dangerous scheme when the sanitized document is rendered", async () => {
+    const parsed = await parseDocument(
+      html("broadcast", '<p><a href="javascript:alert(1)">danger</a></p>'),
+      { broadcast },
+    )
+
+    const composed = await composeDocument(
+      { kind: "document", type: "broadcast", document: parsed.document },
+      { broadcast },
+    )
+
+    expect(composed.html).not.toContain("javascript:")
+    expect(composed.html).toContain("danger")
+  })
+})
