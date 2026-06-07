@@ -105,6 +105,7 @@ async function loadRenderMarkdown(): Promise<RenderMarkdown> {
     const mod = (await import(/* @vite-ignore */ "marked")) as {
       marked?: { parse?: (markdown: string) => string | Promise<string> }
     }
+
     const marked = mod.marked
     if (marked && typeof marked.parse === "function") {
       const parse = marked.parse.bind(marked)
@@ -117,6 +118,62 @@ async function loadRenderMarkdown(): Promise<RenderMarkdown> {
   }
 
   throw new Error("marked is missing the expected parse export; check the installed version")
+}
+
+// The schema whitelists nodes and attributes but never validates URI protocols, so a
+// javascript:/data: href on a link or button reaches content_json unchecked. Allow only safe schemes.
+const ALLOWED_URI_SCHEMES: ReadonlySet<string> = new Set(["http", "https", "mailto", "tel"])
+
+// Characters browsers ignore when resolving a scheme (so "java\tscript:" runs as javascript:).
+// Built numerically to keep the source free of literal control characters.
+const URI_IGNORED_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x00, 0x20],
+  [0xa0, 0xa0],
+  [0x1680, 0x1680],
+  [0x180e, 0x180e],
+  [0x2000, 0x2029],
+  [0x205f, 0x205f],
+  [0x3000, 0x3000],
+  [0xfeff, 0xfeff],
+]
+const escapeCodePoint = (code: number): string => "\\u" + code.toString(16).padStart(4, "0")
+const URI_IGNORED_CHARS = new RegExp(
+  "[" +
+    URI_IGNORED_RANGES.map(([lo, hi]) => escapeCodePoint(lo) + "-" + escapeCodePoint(hi)).join("") +
+    "]",
+  "g",
+)
+
+function hasAllowedUriScheme(uri: string): boolean {
+  // No scheme → relative/anchor/query; nothing to neutralize.
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(uri.replace(URI_IGNORED_CHARS, ""))?.[1]
+
+  return scheme === undefined || ALLOWED_URI_SCHEMES.has(scheme.toLowerCase())
+}
+
+// Blank disallowed hrefs (link marks and nodes like button) in place; the tree is fresh
+// toJSON() output, so mutation is safe.
+function neutralizeUnsafeUris(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) neutralizeUnsafeUris(item)
+    return
+  }
+
+  if (value === null || typeof value !== "object") return
+
+  const node = value as {
+    attrs?: Record<string, unknown>
+    marks?: unknown
+    content?: unknown
+  }
+
+  const attrs = node.attrs
+  if (attrs && typeof attrs.href === "string" && !hasAllowedUriScheme(attrs.href)) {
+    attrs.href = ""
+  }
+
+  neutralizeUnsafeUris(node.marks)
+  neutralizeUnsafeUris(node.content)
 }
 
 // Both inputs converge on HTML: markdown is rendered first, then parsed like any HTML.
@@ -191,6 +248,7 @@ export async function parseDocument(
   const parseHTML = dependencies.generateJSON ?? (await loadGenerateJSON())
   const parsed = parseHTML(html, extensions)
   const document = schema.nodeFromJSON(parsed).toJSON()
+  neutralizeUnsafeUris(document)
 
   return { document }
 }
