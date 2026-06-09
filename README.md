@@ -33,7 +33,7 @@ react-email-rails automatically renders both HTML and plain-text versions from t
 
 ## Status
 
-**react-email-rails is pre-1.0.** It's tested in CI across the supported Ruby, Rails, Node, and Vite versions, but it hasn't been battle-tested in high-volume production environments yet, and the API may still change before 1.0. Please [share feedback and report issues](https://github.com/heysupertape/react-email-rails/issues).
+**react-email-rails is pre-1.0.** It was extracted from [XOXO](https://xoxo.email) which is pre-launch, so it hasn't been battle-tested in high-volume production environments yet. It's tested in CI across the supported Ruby, Rails, Node, and Vite versions, but the API may still change before 1.0. Please [share feedback and report issues](https://github.com/heysupertape/react-email-rails/issues).
 
 ## Requirements
 
