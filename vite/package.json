@@ -95,7 +95,7 @@
     "@tiptap/pm": "^3",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
-    "@typescript/native-preview": "7.0.0-dev.20260527.2",
+    "@typescript/native-preview": "7.0.0-dev.20260605.1",
     "happy-dom": "^20.8.9",
     "marked": "^18.0.5",
     "oxfmt": "^0.53.0",
