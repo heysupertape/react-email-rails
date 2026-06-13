@@ -10,7 +10,7 @@ importers:
     devDependencies:
       '@react-email/editor':
         specifier: ^1.5.3
-        version: 1.5.3(@floating-ui/dom@1.7.6)(@tiptap/extension-list@3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(happy-dom@20.9.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 1.5.3(@floating-ui/dom@1.7.6)(@tiptap/extension-list@3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(happy-dom@20.10.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@react-email/render':
         specifier: ^2.0.8
         version: 2.0.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -19,7 +19,7 @@ importers:
         version: 3.25.0(@tiptap/pm@3.25.0)
       '@tiptap/html':
         specifier: ^3
-        version: 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.9.0)
+        version: 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.10.3)
       '@tiptap/pm':
         specifier: ^3
         version: 3.25.0
@@ -34,7 +34,7 @@ importers:
         version: 7.0.0-dev.20260605.1
       happy-dom:
         specifier: ^20.8.9
-        version: 20.9.0
+        version: 20.10.3
       marked:
         specifier: ^18.0.5
         version: 18.0.5
@@ -58,7 +58,7 @@ importers:
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.4.2)
       vitest:
         specifier: ^4.1.7
-        version: 4.1.8(@types/node@25.9.3)(happy-dom@20.9.0)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.4.2))
+        version: 4.1.8(@types/node@25.9.3)(happy-dom@20.10.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.4.2))
 
 packages:
 
@@ -1237,6 +1237,10 @@ packages:
     resolution: {integrity: sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==}
     engines: {node: 18 || 20 || >=22}
 
+  buffer-image-size@0.6.4:
+    resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
+    engines: {node: '>=4.0'}
+
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
@@ -1404,8 +1408,8 @@ packages:
     resolution: {integrity: sha512-WOBp/EEGUiIsJSp7wcv/y6MO+lV9UoncWqxuFfm8eBwzWNgyfBd6Gz+IeKQ9jCmyhoH99g15M3T+QaVHFjizVA==}
     engines: {node: '>=4'}
 
-  happy-dom@20.9.0:
-    resolution: {integrity: sha512-GZZ9mKe8r646NUAf/zemnGbjYh4Bt8/MqASJY+pSm5ZDtc3YQox+4gsLI7yi1hba6o+eCsGxpHn5+iEVn31/FQ==}
+  happy-dom@20.10.3:
+    resolution: {integrity: sha512-Hjdiy8RziuCcn5z04QI/rlsNuQoG8P0xxjgvsSMpi89cvIXIOcucQtiHS1yHSShxoBcSCeYqAskINmTiy/mlfw==}
     engines: {node: '>=20.0.0'}
 
   hast-util-from-html@2.0.3:
@@ -2577,7 +2581,7 @@ snapshots:
 
   '@radix-ui/rect@1.1.1': {}
 
-  '@react-email/editor@1.5.3(@floating-ui/dom@1.7.6)(@tiptap/extension-list@3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(happy-dom@20.9.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@react-email/editor@1.5.3(@floating-ui/dom@1.7.6)(@tiptap/extension-list@3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(happy-dom@20.10.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
       '@floating-ui/react-dom': 2.1.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@radix-ui/react-popover': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -2603,7 +2607,7 @@ snapshots:
       '@tiptap/extension-text': 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))
       '@tiptap/extension-underline': 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))
       '@tiptap/extensions': 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)
-      '@tiptap/html': 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.9.0)
+      '@tiptap/html': 3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.10.3)
       '@tiptap/pm': 3.25.0
       '@tiptap/react': 3.25.0(@floating-ui/dom@1.7.6)(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@tiptap/starter-kit': 3.25.0
@@ -2817,11 +2821,11 @@ snapshots:
       '@tiptap/core': 3.25.0(@tiptap/pm@3.25.0)
       '@tiptap/pm': 3.25.0
 
-  '@tiptap/html@3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.9.0)':
+  '@tiptap/html@3.25.0(@tiptap/core@3.25.0(@tiptap/pm@3.25.0))(@tiptap/pm@3.25.0)(happy-dom@20.10.3)':
     dependencies:
       '@tiptap/core': 3.25.0(@tiptap/pm@3.25.0)
       '@tiptap/pm': 3.25.0
-      happy-dom: 20.9.0
+      happy-dom: 20.10.3
 
   '@tiptap/pm@3.25.0':
     dependencies:
@@ -3039,6 +3043,10 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
+  buffer-image-size@0.6.4:
+    dependencies:
+      '@types/node': 25.9.3
+
   chai@6.2.2: {}
 
   chokidar@4.0.3:
@@ -3210,11 +3218,12 @@ snapshots:
 
   globals@11.12.0: {}
 
-  happy-dom@20.9.0:
+  happy-dom@20.10.3:
     dependencies:
       '@types/node': 25.9.3
       '@types/whatwg-mimetype': 3.0.2
       '@types/ws': 8.18.1
+      buffer-image-size: 0.6.4
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
       ws: 8.21.0
@@ -3804,7 +3813,7 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.4.2
 
-  vitest@4.1.8(@types/node@25.9.3)(happy-dom@20.9.0)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.4.2)):
+  vitest@4.1.8(@types/node@25.9.3)(happy-dom@20.10.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.4.2)):
     dependencies:
       '@vitest/expect': 4.1.8
       '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.4.2))
@@ -3828,7 +3837,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.9.3
-      happy-dom: 20.9.0
+      happy-dom: 20.10.3
     transitivePeerDependencies:
       - msw
 
