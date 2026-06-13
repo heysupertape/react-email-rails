@@ -104,7 +104,7 @@ jobs:
           bundle exec rake build
 
       - name: Configure RubyGems trusted publisher credentials
-        uses: rubygems/configure-rubygems-credentials@v2.0.0
+        uses: rubygems/configure-rubygems-credentials@v2.1.0
 
       - name: Publish gem to RubyGems
         run: gem push "pkg/${{ steps.release.outputs.gem_path }}"
