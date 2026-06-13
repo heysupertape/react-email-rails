@@ -5,6 +5,7 @@ require("active_support/concern")
 require("active_support/notifications")
 require("active_support/core_ext/object/blank")
 require("active_support/core_ext/object/json")
+require("active_support/core_ext/hash/deep_merge")
 require("active_support/inflector")
 require("rails/railtie")
 
@@ -24,6 +25,7 @@ require_relative("react_email_rails/render_modes/persistent/command_runner")
 require_relative("react_email_rails/configuration")
 require_relative("react_email_rails/tasks")
 require_relative("react_email_rails/props_resolver")
+require_relative("react_email_rails/shared_props")
 require_relative("react_email_rails/railtie")
 
 module ReactEmailRails

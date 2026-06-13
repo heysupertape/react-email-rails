@@ -34,6 +34,7 @@ class ReactEmailRails::Configuration
     :render_options,
     :transform_props,
     :on_render_error,
+    :deep_merge_shared_props,
   )
 
   attr_reader(
@@ -52,6 +53,7 @@ class ReactEmailRails::Configuration
         config.render_process_max_requests = DEFAULT_RENDER_PROCESS_MAX_REQUESTS
         config.transform_props = :lower_camel
         config.on_render_error = nil
+        config.deep_merge_shared_props = false
       end
     end
   end
