@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- Every `react:` email now receives `mailer` and `message` props, mirroring Action Mailer's `mailer`/`message` ERB view helpers. Rendering now happens after Action Mailer assigns headers, so `message` includes subject, addressing, and default `from`/`reply_to` values. Per-mail and shared props win on conflict, serializers whose `as_json` returns a Hash receive the context, and collection props keep their original shape. The npm package exports matching `Mailer`/`Message` TypeScript types.
+
 ## 0.5.0
 
 - Add `react_email_share` for sharing props across every `react:` email a mailer renders, mirroring inertia-rails' `inertia_share`. Supports static values, lazy lambdas and blocks (evaluated in the mailer instance), `only`/`except`/`if`/`unless` filters, and subclass inheritance. Per-mail props win over shared props.

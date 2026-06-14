@@ -350,6 +350,49 @@ The component receives:
 
 Set `config.deep_merge_shared_props = true` to make deep merging the default for every email.
 
+### Mailer and Message Props
+
+Every `react:` email receives `mailer` and `message` props, mirroring the [`mailer` and `message` view helpers](https://guides.rubyonrails.org/action_mailer_basics.html#action-mailer-view-helpers) available to Action Mailer ERB views.
+
+`mailer` identifies the mailer action. `message` reflects the email after Action Mailer has assigned headers and defaults, including default `from` and `reply_to` values. With the default prop transform, import the `Mailer` and `Message` types to annotate them:
+
+```tsx
+import type { Mailer, Message } from "react-email-rails"
+import { Body, Container, Html, Text } from "@react-email/components"
+
+type WelcomeProps = {
+  account: { name: string }
+  mailer: Mailer
+  message: Message
+}
+
+export default function Welcome({ account, mailer, message }: WelcomeProps) {
+  return (
+    <Html>
+      <Body>
+        <Container>
+          <Text>Welcome, {account.name}</Text>
+          <Text>Re: {message.subject}</Text>
+        </Container>
+      </Body>
+    </Html>
+  )
+}
+```
+
+| Prop | Example |
+|------|---------|
+| `mailer.mailerName` | `"account_mailer"` |
+| `mailer.actionName` | `"welcome"` |
+| `message.subject` | `"Welcome"` |
+| `message.to` | `["account@example.com"]` |
+| `message.cc`, `message.bcc` | `["…"]` or `null` |
+| `message.from`, `message.replyTo` | `["app@example.com"]` |
+
+Context is merged before prop serialization, so keys follow `config.transform_props` just like your own props. The exported TypeScript types describe the default `:lower_camel` shape.
+
+Per-mail and shared props win on conflict, so a prop named `mailer` or `message` overrides the injected context. Serializer props receive the context when `as_json` returns a hash. Collections, arrays, and other non-object values pass through unchanged so their top-level shape is preserved.
+
 ### Prop Serialization
 
 Props are serialized with `as_json`, just like `render json:`. You can pass hashes, arrays, Active Model objects, and serializer output from libraries such as [Alba](https://github.com/okuramasafumi/alba) or [ActiveModel::Serializer](https://github.com/rails-api/active_model_serializers).

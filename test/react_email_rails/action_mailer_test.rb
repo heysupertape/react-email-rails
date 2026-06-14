@@ -104,6 +104,57 @@ class DeepMergeMailer < ApplicationMailer
   end
 end
 
+class MailerContextMailer < ApplicationMailer
+  default(reply_to: "noreply@example.com")
+
+  def basic
+    mail(react: { title: "Hi" }, to: ["a@example.com", "b@example.com"], cc: "c@example.com", subject: "Basic")
+  end
+
+  def bare
+    mail(react: true, to: "a@example.com", subject: "Bare")
+  end
+
+  def override
+    mail(react: { mailer: "mine", message: "custom" }, to: "a@example.com", subject: "Override")
+  end
+end
+
+class SerializerPropsMailer < ApplicationMailer
+  class Serializer
+    def initialize(name)
+      @name = name
+    end
+
+    def as_json(*)
+      { "name" => @name }
+    end
+  end
+
+  class CollectionSerializer
+    def initialize(*names)
+      @names = names
+    end
+
+    def as_json(*)
+      @names.map { |name| { "name" => name } }
+    end
+  end
+
+  def show
+    mail(react: "serializer_props_mailer/show", props: Serializer.new("Ada"), to: "a@example.com", subject: "Serializer")
+  end
+
+  def collection
+    mail(
+      react: "serializer_props_mailer/collection",
+      props: CollectionSerializer.new("Ada", "Grace"),
+      to: "a@example.com",
+      subject: "Collection",
+    )
+  end
+end
+
 class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
   class FakeRenderer
     Request = Data.define(:payload, :label) do
@@ -124,7 +175,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     def render
       props = @payload[:props] || {}
-      name = props[:name] || props["name"]
+      name = props[:name] || props["name"] if props.is_a?(Hash)
       self.class.requests << Request.new(payload: @payload, label: @label)
       ReactEmailRails::RenderedEmail.new(html: "<h1>Hello #{name}</h1>", text: "Hello #{name}")
     end
@@ -153,7 +204,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/welcome", request.component)
-    assert_equal({ "name" => "Ada" }, request.props)
+    assert_equal({ "name" => "Ada" }, request.props.except("mailer", "message"))
   end
 
   test("mail react string uses explicit component and top-level props") do
@@ -161,7 +212,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/welcome", request.component)
-    assert_equal({ "name" => "Grace" }, request.props)
+    assert_equal({ "name" => "Grace" }, request.props.except("mailer", "message"))
   end
 
   test("mail react true uses instance props when enabled") do
@@ -169,7 +220,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/assigns", request.component)
-    assert_equal({ "name" => "Katherine" }, request.props)
+    assert_equal({ "name" => "Katherine" }, request.props.except("mailer", "message"))
   end
 
   test("react true excludes mailer params from instance props") do
@@ -178,7 +229,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     end
 
     request = FakeRenderer.requests.sole
-    assert_equal({ "name" => "Grace" }, request.props)
+    assert_equal({ "name" => "Grace" }, request.props.except("mailer", "message"))
   end
 
   test("react true without use_react_instance_props infers the component and sends no props") do
@@ -186,7 +237,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
 
     request = FakeRenderer.requests.sole
     assert_equal("react_email_no_assigns_mailer/assigns", request.component)
-    assert_equal({}, request.props)
+    assert_equal({}, request.props.except("mailer", "message"))
   end
 
   test("rejects props when react is already a prop hash") do
@@ -228,10 +279,11 @@ class ReactEmailRails::SharedPropsTest < ActiveSupport::TestCase
     ReactEmailRails::ActionMailerTest::FakeRenderer.requests = []
   end
 
+  # Drops the always-present `mailer`/`message` context so assertions focus on app props.
   def props_for(&block)
     ReactEmailRails::ActionMailerTest::FakeRenderer.requests = []
     with_react_email_config(render_mode: ReactEmailRails::ActionMailerTest::FakeRenderer, &block)
-    ReactEmailRails::ActionMailerTest::FakeRenderer.requests.sole.props
+    ReactEmailRails::ActionMailerTest::FakeRenderer.requests.sole.props.except("mailer", "message")
   end
 
   test("merges shared props beneath the per-mail props") do
@@ -310,5 +362,68 @@ class ReactEmailRails::SharedPropsTest < ActiveSupport::TestCase
     end
 
     assert_equal({ "theme" => "dark", "locale" => "en" }, props["settings"])
+  end
+end
+
+class ReactEmailRails::MailerContextTest < ActiveSupport::TestCase
+  FakeRenderer = ReactEmailRails::ActionMailerTest::FakeRenderer
+
+  setup do
+    FakeRenderer.requests = []
+  end
+
+  def props_for(&block)
+    with_react_email_config(render_mode: FakeRenderer, &block)
+    FakeRenderer.requests.sole.props
+  end
+
+  test("injects the mailer name and action as the camelized mailer prop") do
+    props = props_for { MailerContextMailer.basic.message }
+
+    assert_equal({ "mailerName" => "mailer_context_mailer", "actionName" => "basic" }, props["mailer"])
+  end
+
+  test("injects the message subject and recipients as the message prop") do
+    props = props_for { MailerContextMailer.basic.message }
+
+    assert_equal("Basic", props["message"]["subject"])
+    assert_equal(["a@example.com", "b@example.com"], props["message"]["to"])
+    assert_equal(["c@example.com"], props["message"]["cc"])
+    assert_nil(props["message"]["bcc"])
+  end
+
+  test("message reflects defaults applied by Action Mailer, like an ERB view") do
+    props = props_for { MailerContextMailer.basic.message }
+
+    assert_equal(["test@example.com"], props["message"]["from"])
+    assert_equal(["noreply@example.com"], props["message"]["replyTo"])
+  end
+
+  test("context is injected for react: true with no other props") do
+    props = props_for { MailerContextMailer.bare.message }
+
+    assert_equal("bare", props["mailer"]["actionName"])
+    assert_equal("Bare", props["message"]["subject"])
+  end
+
+  test("per-mail props win over the mailer and message context on conflict") do
+    props = props_for { MailerContextMailer.override.message }
+
+    assert_equal("mine", props["mailer"])
+    assert_equal("custom", props["message"])
+  end
+
+  test("serializer props receive context when they serialize to a hash") do
+    props = props_for { SerializerPropsMailer.show.message }
+
+    assert_equal("Ada", props["name"])
+    assert_equal("show", props["mailer"]["actionName"])
+    assert_equal("Serializer", props["message"]["subject"])
+  end
+
+  test("collection props flow through without context") do
+    props = props_for { SerializerPropsMailer.collection.message }
+
+    assert_equal([{ "name" => "Ada" }, { "name" => "Grace" }], props)
   end
 end
