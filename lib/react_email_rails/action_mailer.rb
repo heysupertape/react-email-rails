@@ -13,8 +13,6 @@ module ReactEmailRails::ActionMailer
       self.react_email_use_instance_props = true
     end
 
-    # Share props with every `react:` email this mailer and its subclasses render.
-    # Mirrors inertia-rails `inertia_share`; `only`/`except`/`if`/`unless` go to `before_action`.
     def react_email_share(hash = nil, **props, &block)
       options = props.slice(*SHARED_FILTER_OPTIONS)
       data = hash || props.except(*SHARED_FILTER_OPTIONS)
@@ -25,7 +23,6 @@ module ReactEmailRails::ActionMailer
     end
   end
 
-  # Share props from within an action, e.g. conditionally before calling `mail`.
   def react_email_share(hash = nil, **props, &block)
     react_email_append_shared(hash || props, block)
   end
@@ -43,17 +40,24 @@ module ReactEmailRails::ActionMailer
       resolved_props,
       deep_merge: react_email_deep_merge?(deep_merge),
     )
-    render_options = ReactEmailRails.configuration.resolve_render_options(self)
-    rendered = ReactEmailRails.render(component:, props: resolved_props, render_options:)
 
     super(headers) do |format|
+      rendered = react_email_render(component, resolved_props)
+
       format.html { rendered.html }
       format.text { rendered.text } if rendered.text.present?
+
       yield(format) if block
     end
   end
 
   private
+
+  def react_email_render(component, props)
+    props = ReactEmailRails::MailerContext.new(self).merge_into(props)
+    render_options = ReactEmailRails.configuration.resolve_render_options(self)
+    ReactEmailRails.render(component:, props:, render_options:)
+  end
 
   def react_email_append_shared(data, block)
     store = (@_react_email_shared ||= [])

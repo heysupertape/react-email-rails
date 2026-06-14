@@ -164,7 +164,6 @@ class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
     )
   end
 
-  # First capture-group match across an ordered list of patterns, or nil.
   def first_capture(source, *patterns)
     patterns.each do |pattern|
       match = source[pattern, 1]

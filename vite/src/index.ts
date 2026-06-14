@@ -250,6 +250,8 @@ export type {
   EmailModule,
   EmailRegistry,
   EmailRenderOptions,
+  Mailer,
+  Message,
   RenderedEmail,
   RenderRequest,
   RenderResult,

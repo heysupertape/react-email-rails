@@ -26,6 +26,7 @@ require_relative("react_email_rails/configuration")
 require_relative("react_email_rails/tasks")
 require_relative("react_email_rails/props_resolver")
 require_relative("react_email_rails/shared_props")
+require_relative("react_email_rails/mailer_context")
 require_relative("react_email_rails/railtie")
 
 module ReactEmailRails
@@ -58,8 +59,7 @@ module ReactEmailRails
       perform(payload:, label: type, kind: "document", type:)
     end
 
-    # Parse semantic HTML or Markdown into an editor document Hash using the renderer's
-    # extensions. Pass exactly one of `html:` or `markdown:`.
+    # Returns an editor document Hash, built via the renderer's extensions. Pass exactly one of `html:`/`markdown:`.
     def parse(type:, html: nil, markdown: nil, context: {})
       payload = {
         kind: "parse",
