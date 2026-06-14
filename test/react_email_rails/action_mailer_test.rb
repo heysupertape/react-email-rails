@@ -42,6 +42,68 @@ class ReactEmailTestMailerPreview < ActionMailer::Preview
   delegate(:welcome, to: ReactEmailTestMailer)
 end
 
+class SharedPropsMailer < ApplicationMailer
+  react_email_share(brand: "Acme")
+  react_email_share(total: -> { compute_total })
+  react_email_share do
+    { action: action_name }
+  end
+  react_email_share(only: [:promo]) do
+    { promo: true }
+  end
+
+  def show
+    mail(react: { title: "Show" }, to: "a@example.com", subject: "Show")
+  end
+
+  def promo
+    mail(react: { title: "Promo" }, to: "a@example.com", subject: "Promo")
+  end
+
+  def override
+    mail(react: { brand: "Custom" }, to: "a@example.com", subject: "Override")
+  end
+
+  def bare
+    mail(react: true, to: "a@example.com", subject: "Bare")
+  end
+
+  def explicit
+    mail(react: "shared_props_mailer/show", props: { title: "Explicit" }, to: "a@example.com", subject: "Explicit")
+  end
+
+  def with_instance_share
+    react_email_share(notice: "instance")
+    mail(react: { title: "Instance" }, to: "a@example.com", subject: "Instance")
+  end
+
+  private
+
+  def compute_total = 42
+end
+
+class ChildSharedPropsMailer < SharedPropsMailer
+  react_email_share(scope: "child")
+
+  def show
+    mail(react: { title: "Child" }, to: "a@example.com", subject: "Child")
+  end
+end
+
+class DeepMergeMailer < ApplicationMailer
+  react_email_share do
+    { settings: { theme: "light", locale: "en" } }
+  end
+
+  def shallow
+    mail(react: { settings: { theme: "dark" } }, to: "a@example.com", subject: "Shallow")
+  end
+
+  def deep
+    mail(react: { settings: { theme: "dark" } }, deep_merge: true, to: "a@example.com", subject: "Deep")
+  end
+end
+
 class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
   class FakeRenderer
     Request = Data.define(:payload, :label) do
@@ -158,5 +220,95 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     end
 
     assert_equal("render process down", error.message)
+  end
+end
+
+class ReactEmailRails::SharedPropsTest < ActiveSupport::TestCase
+  setup do
+    ReactEmailRails::ActionMailerTest::FakeRenderer.requests = []
+  end
+
+  def props_for(&block)
+    ReactEmailRails::ActionMailerTest::FakeRenderer.requests = []
+    with_react_email_config(render_mode: ReactEmailRails::ActionMailerTest::FakeRenderer, &block)
+    ReactEmailRails::ActionMailerTest::FakeRenderer.requests.sole.props
+  end
+
+  test("merges shared props beneath the per-mail props") do
+    props = props_for { SharedPropsMailer.show.message }
+
+    assert_equal({ "brand" => "Acme", "total" => 42, "action" => "show", "title" => "Show" }, props)
+  end
+
+  test("per-mail props win over shared props on conflict") do
+    props = props_for { SharedPropsMailer.override.message }
+
+    assert_equal("Custom", props["brand"])
+  end
+
+  test("blocks are evaluated lazily in the mailer instance context") do
+    props = props_for { SharedPropsMailer.promo.message }
+
+    assert_equal("promo", props["action"])
+  end
+
+  test("lambda values are evaluated lazily in the mailer instance context") do
+    props = props_for { SharedPropsMailer.show.message }
+
+    assert_equal(42, props["total"])
+  end
+
+  test("filters scope a shared block to specific actions") do
+    assert(props_for { SharedPropsMailer.promo.message }["promo"])
+    assert_nil(props_for { SharedPropsMailer.show.message }["promo"])
+  end
+
+  test("shared props apply to the explicit component and props form") do
+    props = props_for { SharedPropsMailer.explicit.message }
+
+    assert_equal({ "brand" => "Acme", "total" => 42, "action" => "explicit", "title" => "Explicit" }, props)
+  end
+
+  test("shared props apply to react: true with no instance props") do
+    props = props_for { SharedPropsMailer.bare.message }
+
+    assert_equal({ "brand" => "Acme", "total" => 42, "action" => "bare" }, props)
+  end
+
+  test("react_email_share inside an action shares props for that mail") do
+    props = props_for { SharedPropsMailer.with_instance_share.message }
+
+    assert_equal("instance", props["notice"])
+    assert_equal("Instance", props["title"])
+  end
+
+  test("subclasses inherit shared props and can add their own") do
+    props = props_for { ChildSharedPropsMailer.show.message }
+
+    assert_equal({ "brand" => "Acme", "total" => 42, "action" => "show", "scope" => "child", "title" => "Child" }, props)
+  end
+
+  test("shallow merge replaces nested shared hashes by default") do
+    props = props_for { DeepMergeMailer.shallow.message }
+
+    assert_equal({ "theme" => "dark" }, props["settings"])
+  end
+
+  test("deep_merge: true merges nested shared hashes") do
+    props = props_for { DeepMergeMailer.deep.message }
+
+    assert_equal({ "theme" => "dark", "locale" => "en" }, props["settings"])
+  end
+
+  test("deep_merge_shared_props config deep merges without a per-mail flag") do
+    props = with_react_email_config(
+      render_mode: ReactEmailRails::ActionMailerTest::FakeRenderer,
+      deep_merge_shared_props: true,
+    ) do
+      DeepMergeMailer.shallow.message
+      ReactEmailRails::ActionMailerTest::FakeRenderer.requests.sole.props
+    end
+
+    assert_equal({ "theme" => "dark", "locale" => "en" }, props["settings"])
   end
 end

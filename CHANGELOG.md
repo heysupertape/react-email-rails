@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+
+- Add `react_email_share` for sharing props across every `react:` email a mailer renders, mirroring inertia-rails' `inertia_share`. Supports static values, lazy lambdas and blocks (evaluated in the mailer instance), `only`/`except`/`if`/`unless` filters, and subclass inheritance. Per-mail props win over shared props.
+- Shared props merge shallowly by default. Pass `deep_merge: true` to `mail` to merge nested hashes, or set `config.deep_merge_shared_props = true` to make it the default.
+
 ## 0.4.1
 
 - `ReactEmailRails.parse` now neutralizes unsafe link/button URI schemes: hrefs whose scheme is not `http`, `https`, `mailto`, or `tel` (e.g. `javascript:`/`data:`) are blanked before they reach the document `Hash`. Scheme detection ignores the whitespace and control characters browsers strip when resolving a scheme, so case- and whitespace-obfuscated payloads are caught too.

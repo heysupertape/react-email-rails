@@ -160,7 +160,7 @@ That's it. It now renders and delivers like any other Action Mailer email.
 
 ## Usage
 
-Pass data from your mailer. Each top-level key becomes a prop on the component's default export.
+Pass data from your mailer and each top-level key becomes a prop on the component's default export. Our API mirrors [inertia-rails](https://inertia-rails.dev), making the two libraries feel consistent when used together.
 
 ```ruby
 mail react: { foo: "bar" }, ...
@@ -172,9 +172,11 @@ export default function Email({ foo }: { foo: string }) {
 }
 ```
 
-Choose the level of inference you want:
+### Props
 
-### Implicit Component, Instance Props
+Choose the level of inference you want for your props:
+
+#### Implicit Component, Instance Props
 
 ```ruby
 class AccountMailer < ApplicationMailer
@@ -191,7 +193,7 @@ Action Mailer's framework assigns (including `params` and `rendered_format`) are
 
 Without `use_react_instance_props`, `react: true` still infers the component and renders it with no props, which is handy for emails that take no props at all.
 
-### Implicit Component, Explicit Props
+#### Implicit Component, Explicit Props
 
 ```ruby
 mail(
@@ -204,7 +206,7 @@ mail(
 )
 ```
 
-### Explicit Component, Explicit Props
+#### Explicit Component, Explicit Props
 
 ```ruby
 mail(
@@ -218,7 +220,81 @@ mail(
 )
 ```
 
-These forms mirror [inertia-rails](https://inertia-rails.dev), making the two libraries feel consistent when used together.
+### Shared Props
+
+Use `react_email_share` to share data with all of a mailer's emails and subclasses, and it'll be automatically merged with any inline props.
+
+```ruby
+class MarketingMailer < ApplicationMailer
+  # Static value
+  react_email_share app_name: "Acme"
+
+  # Lambda value, evaluated lazily in the mailer instance
+  react_email_share unread_count: -> { current_user&.unread_count }
+
+  # Block, evaluated lazily in the mailer instance
+  react_email_share do
+    { brand: { name: "Acme", url: marketing_url } }
+  end
+end
+```
+
+Per-mail props win over shared props of the same name, so a mailer can always override what it inherits:
+
+```ruby
+mail react: { app_name: "Acme Pro" }, ... # overrides the shared app_name
+```
+
+Shared props apply to all three forms above (`react:` hash, `react: "component", props:`, and `react: true`).
+
+#### Conditional Sharing
+
+Pass any `before_action` filter (`only`, `except`, `if`, `unless`) to scope a share to certain actions:
+
+```ruby
+react_email_share only: [:welcome, :reactivation] do
+  { promotion: current_promotion }
+end
+
+react_email_share if: :user_signed_in? do
+  { user: { name: current_user.name } }
+end
+```
+
+You can also share from inside an action, before calling `mail`:
+
+```ruby
+def welcome
+  react_email_share notice: "Thanks for joining!"
+  mail react: { account: }, to: account.email, subject: "Welcome"
+end
+```
+
+#### Deep Merging
+
+By default shared props are merged shallowly, so a per-mail prop replaces a shared one of the same name outright. Pass `deep_merge: true` to merge nested hashes instead:
+
+```ruby
+react_email_share do
+  { settings: { theme: "light", locale: "en" } }
+end
+
+# Shallow (default): settings => { theme: "dark" }
+mail react: { settings: { theme: "dark" } }, ...
+
+# Deep: settings => { theme: "dark", locale: "en" }
+mail react: { settings: { theme: "dark" } }, deep_merge: true, ...
+```
+
+Set `config.deep_merge_shared_props = true` to make deep merging the default for every email. (See [Configuration](#configuration))
+
+### Prop Serialization
+
+Like `render json:`, `mail react:` accepts any object that responds to `as_json`, including hashes, Active Model objects, and serializers such as [Alba](https://github.com/okuramasafumi/alba) or [ActiveModel::Serializer](https://github.com/rails-api/active_model_serializers).
+
+### Prop Transformation
+
+Prop keys are camelized by default, so `account.plan_name` arrives as `account.planName`. Override `transform_props` in your [configuration](#configuration).
 
 ### Component Names
 
@@ -240,14 +316,6 @@ mail react: "users/welcome", props: { user: }, to:, subject:
 ```
 
 Or override `component_path_resolver` globally in your [configuration](#configuration).
-
-### Prop Serialization
-
-Like `render json:`, `mail react:` accepts any object that responds to `as_json`, including hashes, Active Model objects, and serializers such as [Alba](https://github.com/okuramasafumi/alba) or [ActiveModel::Serializer](https://github.com/rails-api/active_model_serializers).
-
-### Prop Transformation
-
-Prop keys are camelized by default, so `account.plan_name` arrives as `account.planName`. Override `transform_props` in your [configuration](#configuration).
 
 ### Layouts
 
@@ -314,6 +382,7 @@ If the defaults don't fit, override them in `config/initializers/react_email_rai
 | `render_timeout` | `10` seconds |
 | `render_process_max_requests` | `1_000` |
 | `on_render_error` | `nil` |
+| `deep_merge_shared_props` | `false` |
 
 #### Prop Transformation
 
