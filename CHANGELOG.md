@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- Fix `react:` rendering — and the `mailer`/`message` props — being skipped for actions that opt in through a class-level `default react: true` rather than a per-`mail` `react:` option. `mail` now resolves `react` (in any form: `true`, a component string, or a prop hash) from the mailer's `default`, a per-action `react: false` opts back out, and the internal `react`/`props`/`deep_merge` options never leak onto the message as email headers.
+
 ## 0.6.0
 
 - Every `react:` email now receives `mailer` and `message` props, mirroring Action Mailer's `mailer`/`message` ERB view helpers. Rendering now happens after Action Mailer assigns headers, so `message` includes subject, addressing, and default `from`/`reply_to` values. Per-mail and shared props win on conflict, serializers whose `as_json` returns a Hash receive the context, and collection props keep their original shape. The npm package exports matching `Mailer`/`Message` TypeScript types.

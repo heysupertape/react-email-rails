@@ -240,6 +240,14 @@ end
 
 Action Mailer's framework assigns, including `params` and `rendered_format`, are excluded from instance props.
 
+To make React the default for every action, set `default react: true` on the mailer (or `ApplicationMailer`). Each `mail` call then renders the inferred component without repeating `react: true`, and a single action can opt back out with `react: false`:
+
+```ruby
+class ApplicationMailer < ActionMailer::Base
+  default react: true
+end
+```
+
 ### Explicit Components
 
 Pass a component name when the mailer action and component path do not line up:
