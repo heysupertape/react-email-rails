@@ -28,12 +28,15 @@ module ReactEmailRails::ActionMailer
   end
 
   def mail(headers = {}, &block)
-    return super unless headers.is_a?(Hash) && headers.key?(:react)
+    return super unless headers.is_a?(Hash)
+    return super if headers.empty? && @_mail_was_called
 
-    headers = headers.dup
-    react = headers.delete(:react)
-    props = headers.delete(:props) if headers.key?(:props)
-    deep_merge = headers.delete(:deep_merge) if headers.key?(:deep_merge)
+    react = headers.key?(:react) ? headers[:react] : compute_default(self.class.default[:react])
+    return super unless react
+
+    props = headers[:props]
+    deep_merge = headers[:deep_merge]
+    headers = headers.except(:react, :props, :deep_merge)
 
     component, resolved_props = ReactEmailRails::PropsResolver.new(self).resolve(react, props)
     resolved_props = ReactEmailRails::SharedProps.new(self).merge_into(
@@ -52,6 +55,10 @@ module ReactEmailRails::ActionMailer
   end
 
   private
+
+  def assign_headers_to_message(message, headers)
+    super(message, headers.except(:react, :props, :deep_merge))
+  end
 
   def react_email_render(component, props)
     props = ReactEmailRails::MailerContext.new(self).merge_into(props)

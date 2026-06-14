@@ -120,6 +120,44 @@ class MailerContextMailer < ApplicationMailer
   end
 end
 
+class DefaultReactMailer < ApplicationMailer
+  default(react: true)
+  use_react_instance_props
+
+  def greet
+    @name = "Ada"
+    mail(to: "ada@example.com", subject: "Greet")
+  end
+
+  def opt_out
+    mail(react: false, body: "Plain text", to: "ada@example.com", subject: "Opt out")
+  end
+end
+
+class DefaultReactStringMailer < ApplicationMailer
+  default(react: "default_react_string_mailer/show")
+
+  def show
+    mail(props: { name: "Grace" }, to: "grace@example.com", subject: "String")
+  end
+end
+
+class DefaultReactHashMailer < ApplicationMailer
+  default(react: { title: "Hi" })
+
+  def show
+    mail(to: "hi@example.com", subject: "Hash")
+  end
+end
+
+class DefaultReactProcMailer < ApplicationMailer
+  default(react: -> { true })
+
+  def show
+    mail(to: "proc@example.com", subject: "Proc")
+  end
+end
+
 class SerializerPropsMailer < ApplicationMailer
   class Serializer
     def initialize(name)
@@ -221,6 +259,8 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/assigns", request.component)
     assert_equal({ "name" => "Katherine" }, request.props.except("mailer", "message"))
+    assert_equal("assigns", request.props.dig("mailer", "actionName"))
+    assert_equal("Assigns", request.props.dig("message", "subject"))
   end
 
   test("react true excludes mailer params from instance props") do
@@ -425,5 +465,73 @@ class ReactEmailRails::MailerContextTest < ActiveSupport::TestCase
     props = props_for { SerializerPropsMailer.collection.message }
 
     assert_equal([{ "name" => "Ada" }, { "name" => "Grace" }], props)
+  end
+end
+
+class ReactEmailRails::DefaultReactMailerTest < ActiveSupport::TestCase
+  FakeRenderer = ReactEmailRails::ActionMailerTest::FakeRenderer
+
+  setup do
+    FakeRenderer.requests = []
+  end
+
+  test("a class-level default react: true opts every action into React rendering") do
+    message = with_react_email_config(render_mode: FakeRenderer) { DefaultReactMailer.greet.message }
+
+    request = FakeRenderer.requests.sole
+    assert_equal("default_react_mailer/greet", request.component)
+    assert_equal("Ada", request.props["name"])
+    assert_includes(message.html_part.body.decoded, "<h1>Hello Ada</h1>")
+  end
+
+  test("default react: true still merges the mailer and message props") do
+    with_react_email_config(render_mode: FakeRenderer) { DefaultReactMailer.greet.message }
+
+    props = FakeRenderer.requests.sole.props
+    assert_equal({ "mailerName" => "default_react_mailer", "actionName" => "greet" }, props["mailer"])
+    assert_equal("Greet", props["message"]["subject"])
+    assert_equal(["ada@example.com"], props["message"]["to"])
+  end
+
+  test("the internal react options never leak onto the message as headers") do
+    message = with_react_email_config(render_mode: FakeRenderer) { DefaultReactMailer.greet.message }
+
+    assert_nil(message[:react])
+    assert_nil(message[:props])
+    assert_nil(message[:deep_merge])
+  end
+
+  test("a per-mail react: false opts a single action back out of a default react mailer") do
+    message = with_react_email_config(render_mode: FakeRenderer) { DefaultReactMailer.opt_out.message }
+
+    assert_empty(FakeRenderer.requests)
+    assert_equal("Plain text", message.body.decoded.strip)
+    assert_nil(message[:react])
+  end
+
+  test("a default react: string resolves the explicit component with per-mail props and context") do
+    with_react_email_config(render_mode: FakeRenderer) { DefaultReactStringMailer.show.message }
+
+    request = FakeRenderer.requests.sole
+    assert_equal("default_react_string_mailer/show", request.component)
+    assert_equal("Grace", request.props["name"])
+    assert_equal("show", request.props.dig("mailer", "actionName"))
+  end
+
+  test("a default react: hash supplies the props inline and still merges context") do
+    with_react_email_config(render_mode: FakeRenderer) { DefaultReactHashMailer.show.message }
+
+    request = FakeRenderer.requests.sole
+    assert_equal("default_react_hash_mailer/show", request.component)
+    assert_equal("Hi", request.props["title"])
+    assert_equal("Hash", request.props.dig("message", "subject"))
+  end
+
+  test("a default react: proc is evaluated like other Action Mailer defaults") do
+    with_react_email_config(render_mode: FakeRenderer) { DefaultReactProcMailer.show.message }
+
+    request = FakeRenderer.requests.sole
+    assert_equal("default_react_proc_mailer/show", request.component)
+    assert_equal("Proc", request.props.dig("message", "subject"))
   end
 end
