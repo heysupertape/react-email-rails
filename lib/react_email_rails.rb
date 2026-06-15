@@ -27,6 +27,7 @@ require_relative("react_email_rails/tasks")
 require_relative("react_email_rails/props_resolver")
 require_relative("react_email_rails/shared_props")
 require_relative("react_email_rails/mailer_context")
+require_relative("react_email_rails/preview_live_reload")
 require_relative("react_email_rails/railtie")
 
 module ReactEmailRails
@@ -46,7 +47,6 @@ module ReactEmailRails
       perform(payload:, label: component, kind: "email", component:)
     end
 
-    # The document is sent verbatim (keys are structural); only context is key-transformed, like props.
     def compose(type:, document:, context: {}, preview: nil)
       payload = {
         kind: "document",
@@ -59,7 +59,6 @@ module ReactEmailRails
       perform(payload:, label: type, kind: "document", type:)
     end
 
-    # Returns an editor document Hash, built via the renderer's extensions. Pass exactly one of `html:`/`markdown:`.
     def parse(type:, html: nil, markdown: nil, context: {})
       payload = {
         kind: "parse",
@@ -90,7 +89,6 @@ module ReactEmailRails
       raise
     end
 
-    # Markdown is converted renderer-side, not here; both inputs are sent as-is.
     def parse_source(html:, markdown:)
       if !html.nil? && !markdown.nil?
         raise(ArgumentError, "ReactEmailRails.parse accepts only one of html: or markdown:")

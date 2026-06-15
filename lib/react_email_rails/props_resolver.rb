@@ -1,6 +1,5 @@
 class ReactEmailRails::PropsResolver
   INTERNAL_ASSIGN_PREFIX = "_"
-  # Some Action Mailer framework assigns do not use the internal `_` prefix.
   RESERVED_ASSIGNS = ["params", "rendered_format"].freeze
 
   def initialize(mailer)
@@ -34,7 +33,6 @@ class ReactEmailRails::PropsResolver
   end
 
   def assign_props
-    # `react: true` infers the component; instance vars become props only when the mailer opts in.
     return {} unless mailer.class.react_email_use_instance_props
 
     mailer.instance_variables.each_with_object({}) do |ivar, props|

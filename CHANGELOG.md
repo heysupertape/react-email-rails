@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+
+- Add development live-reloading for Action Mailer previews. A development-only preview interceptor injects Vite's `@vite/client` into previews, and the `reactEmailRails()` plugin triggers a full reload when an email component changes, so the open preview refreshes on save. Configure the dev-server URL with `live_reload_url`, or set it to a falsy value to disable.
+
 ## 0.6.1
 
 - Fix `react:` rendering — and the `mailer`/`message` props — being skipped for actions that opt in through a class-level `default react: true` rather than a per-`mail` `react:` option. `mail` now resolves `react` (in any form: `true`, a component string, or a prop hash) from the mailer's `default`, a per-action `react: false` opts back out, and the internal `react`/`props`/`deep_merge` options never leak onto the message as email headers.

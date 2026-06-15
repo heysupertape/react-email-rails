@@ -19,8 +19,6 @@ unless vite_version_source.match?(/RENDER_PROTOCOL_VERSION = #{ReactEmailRails::
   abort("vite/src/version.ts RENDER_PROTOCOL_VERSION does not match ReactEmailRails::RENDER_PROTOCOL_VERSION #{ReactEmailRails::RENDER_PROTOCOL_VERSION}")
 end
 
-# Assert the bundle path matches on both sides so a one-sided edit fails here, not as
-# "bundle not found" at render time. Regex-extracted to avoid heavy requires.
 configuration_source = File.read(File.join(root, "lib/react_email_rails/configuration.rb"))
 ruby_bundle_path = configuration_source[/BUNDLE_PATH = "([^"]+)"/, 1]
 index_source = File.read(File.join(root, "vite/src/index.ts"))

@@ -12,7 +12,6 @@ import type {
   RenderResult,
 } from "./runtime.js"
 
-// Re-exported from runtime.ts (the single source) to keep react-email-rails/document's surface.
 export type { DroppedNode, ParseDocumentRequest, RenderDocumentRequest }
 
 export type DocumentRenderer = {
@@ -21,16 +20,12 @@ export type DocumentRenderer = {
   getPreview?: (context: unknown) => string | null
 }
 
-// Editor-bundled structural nodes render to null by design. Derive the list from
-// the installed editor package so warning filtering tracks version changes.
 const STRUCTURAL_NODE_TYPES: ReadonlySet<string> = new Set(
   resolveExtensions([StarterKit, EmailTheming])
     .filter((extension) => extension.type === "node" && !(extension instanceof EmailNode))
     .map((extension) => extension.name),
 )
 
-// composeReactEmail renders a node as null when no extension matches or the match isn't an
-// EmailNode; mirror that here so warnings catch the silent case (in-schema node, no email renderer).
 function collectDroppedNodes(document: unknown, extensions: Extensions): DroppedNode[] {
   const byName = new Map<string, Extensions[number]>()
   for (const extension of extensions) byName.set(extension.name, extension)
@@ -62,7 +57,6 @@ export type DocumentRegistry = Record<string, DocumentLoader>
 type GenerateJSON = (html: string, extensions: Extensions) => unknown
 type RenderMarkdown = (markdown: string) => string | Promise<string>
 
-// Bound at build time by createParseDocument when the peers are bundled; lazy-loaded otherwise.
 type ParseDependencies = {
   generateJSON?: GenerateJSON
   renderMarkdown?: RenderMarkdown
@@ -120,12 +114,8 @@ async function loadRenderMarkdown(): Promise<RenderMarkdown> {
   throw new Error("marked is missing the expected parse export; check the installed version")
 }
 
-// The schema whitelists nodes and attributes but never validates URI protocols, so a
-// javascript:/data: href on a link or button reaches content_json unchecked. Allow only safe schemes.
 const ALLOWED_URI_SCHEMES: ReadonlySet<string> = new Set(["http", "https", "mailto", "tel"])
 
-// Characters browsers ignore when resolving a scheme (so "java\tscript:" runs as javascript:).
-// Built numerically to keep the source free of literal control characters.
 const URI_IGNORED_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0x00, 0x20],
   [0xa0, 0xa0],
@@ -145,14 +135,11 @@ const URI_IGNORED_CHARS = new RegExp(
 )
 
 function hasAllowedUriScheme(uri: string): boolean {
-  // No scheme → relative/anchor/query; nothing to neutralize.
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(uri.replace(URI_IGNORED_CHARS, ""))?.[1]
 
   return scheme === undefined || ALLOWED_URI_SCHEMES.has(scheme.toLowerCase())
 }
 
-// Blank disallowed hrefs (link marks and nodes like button) in place; the tree is fresh
-// toJSON() output, so mutation is safe.
 function neutralizeUnsafeUris(value: unknown): void {
   if (Array.isArray(value)) {
     for (const item of value) neutralizeUnsafeUris(item)
@@ -176,7 +163,6 @@ function neutralizeUnsafeUris(value: unknown): void {
   neutralizeUnsafeUris(node.content)
 }
 
-// Both inputs converge on HTML: markdown is rendered first, then parsed like any HTML.
 async function resolveHtmlInput(
   request: ParseDocumentRequest,
   dependencies: ParseDependencies,
@@ -199,7 +185,6 @@ export async function composeDocument(
   request: RenderDocumentRequest,
   registry: DocumentRegistry,
 ): Promise<RenderResult> {
-  // Fail legibly if the optional editor peers are present but their shape shifted.
   if (
     typeof composeReactEmail !== "function" ||
     typeof resolveExtensions !== "function" ||
@@ -218,8 +203,6 @@ export async function composeDocument(
   const schema = getSchema(extensions)
   const warnings = collectDroppedNodes(document, extensions)
 
-  // The minimal editor composeReactEmail reads, built headless (no DOM, no view).
-  // state.doc is required: EmailTheming finds the globalContent theme node through it.
   const editor = {
     getJSON: () => document,
     extensionManager: { extensions },
@@ -227,11 +210,10 @@ export async function composeDocument(
     state: { doc: schema.nodeFromJSON(document) },
   } as unknown as Editor
 
-  // composeReactEmail takes `preview?: string`; omit it rather than pass null.
   const preview = request.preview ?? renderer.getPreview?.(request.context) ?? null
   const params = preview === null ? { editor } : { editor, preview }
-
   const { html, text } = await composeReactEmail(params)
+
   return warnings.length > 0 ? { html, text, warnings } : { html, text }
 }
 
@@ -243,18 +225,17 @@ export async function parseDocument(
   const renderer = await resolveRenderer(request.type, registry)
   const extensions = resolveExtensions(renderer.buildExtensions(request.context))
   const schema = getSchema(extensions)
-
   const html = await resolveHtmlInput(request, dependencies)
   const parseHTML = dependencies.generateJSON ?? (await loadGenerateJSON())
   const parsed = parseHTML(html, extensions)
   const document = schema.nodeFromJSON(parsed).toJSON()
+
   neutralizeUnsafeUris(document)
 
   return { document }
 }
 
 export function createParseDocument(generateJSON: GenerateJSON, renderMarkdown?: RenderMarkdown) {
-  // Omit renderMarkdown entirely when unset; exactOptionalPropertyTypes forbids passing `undefined`.
   const dependencies: ParseDependencies =
     renderMarkdown === undefined ? { generateJSON } : { generateJSON, renderMarkdown }
   return (request: ParseDocumentRequest, registry: DocumentRegistry): Promise<ParseResult> =>

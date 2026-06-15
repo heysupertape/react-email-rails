@@ -12,7 +12,6 @@ export type EmailsOption =
 
 export type ReactEmailRailsOptions = {
   emails?: EmailsOption
-  // Editor document renderers, discovered like emails. Off by default.
   documents?: EmailsOption | boolean
   standalone?: boolean
   vite?: ReactEmailRailsViteOptions
@@ -59,19 +58,13 @@ const RESOLVED_SERVER = `\0${VIRTUAL_SERVER}`
 const RESOLVED_MAIN = `\0${VIRTUAL_MAIN}`
 const VIRTUAL_MODULE_PATTERN = /virtual:react-email-rails\/(?:server|main)$/
 
-// The dedicated build environment that emits the server-side email bundle.
 export const EMAIL_ENVIRONMENT = "email"
-// Wire contract: must match the Symbol.for(...) keys the bins read in bin/shared.mjs.
 const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
 const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
-// Must match Ruby's Configuration::BUNDLE_PATH (check_version_sync.rb asserts it).
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
 const require = createRequire(import.meta.url)
 
-// happy-dom (via @tiptap/html) pulls in `ws`, which guards optional native-addon requires behind
-// these flags. Setting them lets a standalone (noExternal) build tree-shake the uninstalled
-// bufferutil/utf-8-validate requires away; ws's pure-JS path is all the HTML parser needs.
 const WS_NATIVE_ADDON_OPT_OUT = {
   "process.env.WS_NO_BUFFER_UTIL": "'1'",
   "process.env.WS_NO_UTF_8_VALIDATE": "'1'",
@@ -113,6 +106,15 @@ function normalizeSource(
   return { path, extensions, ignore, root, globArg }
 }
 
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/")
+}
+
+function isWithinSource(file: string, root: string, relativeDir: string): boolean {
+  const base = `${normalizePath(root).replace(/\/+$/, "")}/${relativeDir}/`
+  return normalizePath(file).startsWith(base)
+}
+
 function optionalPeersAvailable(specifiers: string[]): boolean {
   return specifiers.every((specifier) => {
     try {
@@ -134,6 +136,9 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
           DEFAULT_DOCUMENT_PATH,
           DEFAULT_DOCUMENT_EXTENSIONS,
         )
+  const liveReloadDirs = [emailSource.path, documentSource?.path].filter((path): path is string =>
+    Boolean(path),
+  )
   const standalone = options.standalone ?? true
 
   const plugin: Plugin = {
@@ -154,7 +159,6 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
           const lines = [`import { buildRegistry, serve } from "react-email-rails/runtime"`]
           const parserPeersAvailable =
             documentSource && optionalPeersAvailable(["@tiptap/html", "happy-dom"])
-          // Markdown parsing layers `marked` on top of the HTML parser peers.
           const markdownPeerAvailable = parserPeersAvailable && optionalPeersAvailable(["marked"])
 
           if (documentSource) {
@@ -191,10 +195,16 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       },
     },
 
+    hotUpdate(options) {
+      const root = options.server.config.root
+      if (!liveReloadDirs.some((dir) => isWithinSource(options.file, root, dir))) return
+      if (this.environment.name !== "client") return
+
+      this.environment.hot.send({ type: "full-reload" })
+      return []
+    },
+
     config(_config, env: ConfigEnv) {
-      // Dedicated `email` build environment: the react-email-rails-build bin builds it with an
-      // isolated plugin stack so host plugins can't break email SSR. Standalone builds inline
-      // Node deps (so Rails images need no node_modules); dev keeps them external for the runner.
       return {
         environments: {
           [EMAIL_ENVIRONMENT]: {

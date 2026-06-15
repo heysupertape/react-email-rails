@@ -47,7 +47,6 @@ export type RenderDocumentRequest = {
   preview?: string | null
 }
 
-// Exactly one of `html` or `markdown` is set.
 export type ParseDocumentRequest = {
   kind: "parse"
   type: string
@@ -108,8 +107,14 @@ export async function renderEmail(
   const element = React.createElement(mod.default, request.props ?? {})
 
   return {
-    html: await render(element, { ...request.renderOptions?.html, plainText: false }),
-    text: await render(element, { ...request.renderOptions?.text, plainText: true }),
+    html: await render(element, {
+      ...request.renderOptions?.html,
+      plainText: false,
+    }),
+    text: await render(element, {
+      ...request.renderOptions?.text,
+      plainText: true,
+    }),
   }
 }
 

@@ -1,7 +1,6 @@
 module ReactEmailRails::ActionMailer
   extend(ActiveSupport::Concern)
 
-  # `react_email_share` kwargs reserved for `before_action` filtering, not prop data.
   SHARED_FILTER_OPTIONS = [:if, :unless, :only, :except].freeze
 
   prepended do

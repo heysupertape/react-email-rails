@@ -30,8 +30,8 @@ The supported Ruby, Rails, Node, React, and Vite versions are tested in CI. Plea
 
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Your First Email](#your-first-email)
-- [How Rendering Works](#how-rendering-works)
+- [Quick Start](#quick-start)
+- [Rendering](#rendering)
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Deployment](#deployment)
@@ -100,7 +100,7 @@ export default defineConfig({
 })
 ```
 
-## Your First Email
+## Quick Start
 
 Generate a mailer and React Email component:
 
@@ -169,13 +169,25 @@ AccountMailer.with(account: current_account).welcome.deliver_later
 
 React Email also provides primitives like [`<Button>`, `<Heading>`, `<Tailwind>`, and more](https://react.email/docs/components/html).
 
-## How Rendering Works
+## Rendering
 
 In development, react-email-rails renders components through Vite's dev pipeline. Your email components get the same module resolution and transforms as the rest of your frontend.
 
 In production, `assets:precompile` builds a server-side renderer bundle from your Vite config. Rails runs that bundle with Node whenever an email needs to render.
 
 Every `react:` email renders HTML and plain text from the same component. If rendering fails, the email is not sent and `ReactEmailRails::RenderError` is raised.
+
+### Live-Reloading Previews
+
+In development, Action Mailer previews automatically reload themselves when you edit an email component. react-email-rails registers a [preview interceptor](https://api.rubyonrails.org/classes/ActionMailer/Base.html#class-ActionMailer::Base-label-Previewing+emails) that injects `@vite/client` into the preview, and the `reactEmailRails()` plugin broadcasts a full reload over Vite's websocket whenever a file under your emails directory changes.
+
+The `live_reload_url` defaults to Vite's `http://localhost:5173`, but you can point elsewhere if needed, or set it to a falsy value to disable live reload. (See [Configuration](#configuration))
+
+```ruby
+ReactEmailRails.configure do |config|
+  config.live_reload_url = "http://localhost:3036" # or nil or false to disable
+end
+```
 
 ## Usage
 
@@ -492,6 +504,7 @@ end
 | `render_process_max_requests` | `1_000` |
 | `on_render_error` | `nil` |
 | `deep_merge_shared_props` | `false` |
+| `live_reload_url` | `http://localhost:5173` |
 
 ### Prop Transformation
 

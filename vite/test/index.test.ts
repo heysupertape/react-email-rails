@@ -408,6 +408,98 @@ describe("reactEmailRails plugin", () => {
   })
 })
 
+describe("reactEmailRails preview live reload", () => {
+  it("broadcasts a full reload when a file under the email path changes", () => {
+    const plugin = reactEmailRails()
+    const { sent, result } = handleHotUpdate(
+      plugin,
+      "/project/app/javascript/emails/account_mailer/welcome.tsx",
+    )
+
+    expect(sent).toEqual([{ type: "full-reload" }])
+    expect(result).toEqual([])
+  })
+
+  it("broadcasts for newly created files under the email path", () => {
+    const plugin = reactEmailRails()
+    const { sent, result } = handleHotUpdate(
+      plugin,
+      "/project/app/javascript/emails/account_mailer/reset.tsx",
+      "/project",
+      "create",
+    )
+
+    expect(sent).toEqual([{ type: "full-reload" }])
+    expect(result).toEqual([])
+  })
+
+  it("leaves non-client environments to invalidate normally", () => {
+    const plugin = reactEmailRails()
+    const { sent, result } = handleHotUpdate(
+      plugin,
+      "/project/app/javascript/emails/account_mailer/welcome.tsx",
+      "/project",
+      "update",
+      "email",
+    )
+
+    expect(sent).toEqual([])
+    expect(result).toBeUndefined()
+  })
+
+  it("reloads for any file under the email path, including ignored partials and styles", () => {
+    const plugin = reactEmailRails()
+
+    expect(
+      handleHotUpdate(plugin, "/project/app/javascript/emails/_components/layout.tsx").sent,
+    ).toEqual([{ type: "full-reload" }])
+    expect(handleHotUpdate(plugin, "/project/app/javascript/emails/styles.css").sent).toEqual([
+      { type: "full-reload" },
+    ])
+  })
+
+  it("ignores changes outside the email path", () => {
+    const plugin = reactEmailRails()
+    const { sent, result } = handleHotUpdate(plugin, "/project/app/javascript/controllers/hello.ts")
+
+    expect(sent).toEqual([])
+    expect(result).toBeUndefined()
+  })
+
+  it("does not reload for a sibling directory that shares the email path prefix", () => {
+    const plugin = reactEmailRails()
+
+    expect(handleHotUpdate(plugin, "/project/app/javascript/emails-archive/old.tsx").sent).toEqual(
+      [],
+    )
+  })
+
+  it("reloads for the configured custom email path", () => {
+    const plugin = reactEmailRails({ emails: "app/emails" })
+
+    expect(handleHotUpdate(plugin, "/project/app/emails/welcome.tsx").sent).toEqual([
+      { type: "full-reload" },
+    ])
+    expect(handleHotUpdate(plugin, "/project/app/javascript/emails/welcome.tsx").sent).toEqual([])
+  })
+
+  it("reloads for document changes when documents are enabled", () => {
+    const plugin = reactEmailRails({ documents: true })
+
+    expect(
+      handleHotUpdate(plugin, "/project/app/javascript/documents/newsletter.tsx").sent,
+    ).toEqual([{ type: "full-reload" }])
+  })
+
+  it("ignores document changes when documents are disabled", () => {
+    const plugin = reactEmailRails()
+
+    expect(
+      handleHotUpdate(plugin, "/project/app/javascript/documents/newsletter.tsx").sent,
+    ).toEqual([])
+  })
+})
+
 type FilteredHook<T, I = RegExp> = {
   filter: { id: I }
   handler: T
@@ -431,6 +523,34 @@ function load(plugin: ReturnType<typeof reactEmailRails>, id: string): string {
 
   if (!source) throw new Error(`expected source for ${id}`)
   return source
+}
+
+function handleHotUpdate(
+  plugin: ReturnType<typeof reactEmailRails>,
+  file: string,
+  root = "/project",
+  type: "create" | "update" | "delete" = "update",
+  environmentName = "client",
+): { sent: unknown[]; result: unknown } {
+  const sent: unknown[] = []
+  const environment = {
+    name: environmentName,
+    hot: { send: (payload: unknown) => sent.push(payload) },
+  }
+  const options = {
+    type,
+    file,
+    timestamp: 0,
+    modules: [],
+    read: () => "",
+    server: { config: { root } },
+  }
+  const hook = plugin.hotUpdate as unknown as (
+    this: { environment: typeof environment },
+    context: typeof options,
+  ) => unknown
+
+  return { sent, result: hook.call({ environment }, options) }
 }
 
 function pluginConfig(plugin: ReturnType<typeof reactEmailRails>, command: "build" | "serve") {

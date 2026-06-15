@@ -139,7 +139,6 @@ class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
     ].find { |path| File.exist?(File.join(destination_root, path)) }
   end
 
-  # The reactEmailRails({ ... }) plugin call, up to the option key being scanned for.
   PLUGIN_OPENING = /reactEmailRails\s*\(\s*\{.*?/m
 
   def emails_path_from_vite_config

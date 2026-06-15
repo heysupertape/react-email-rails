@@ -1,5 +1,4 @@
 class ReactEmailRails::Configuration
-  # Must match OUT_DIR/BUNDLE_FILE in vite/src/index.ts (check_version_sync.rb asserts it).
   BUNDLE_PATH = "tmp/react-email-rails/emails.js"
   BUILD_BIN = "node_modules/.bin/react-email-rails-build"
   CONFIG_BIN = "node_modules/.bin/react-email-rails-config"
@@ -7,6 +6,7 @@ class ReactEmailRails::Configuration
 
   DEFAULT_RENDER_TIMEOUT = 10
   DEFAULT_RENDER_PROCESS_MAX_REQUESTS = 1_000
+  DEFAULT_LIVE_RELOAD_URL = "http://localhost:5173"
 
   RENDER_MODES = {
     subprocess: ReactEmailRails::RenderModes::Subprocess,
@@ -35,6 +35,7 @@ class ReactEmailRails::Configuration
     :transform_props,
     :on_render_error,
     :deep_merge_shared_props,
+    :live_reload_url,
   )
 
   attr_reader(
@@ -54,8 +55,15 @@ class ReactEmailRails::Configuration
         config.transform_props = :lower_camel
         config.on_render_error = nil
         config.deep_merge_shared_props = false
+        config.live_reload_url = DEFAULT_LIVE_RELOAD_URL
       end
     end
+  end
+
+  def resolve_live_reload_url
+    return if live_reload_url.blank?
+
+    live_reload_url.to_s.chomp("/")
   end
 
   def render_mode=(value)
@@ -88,8 +96,6 @@ class ReactEmailRails::Configuration
     end
   end
 
-  # A callable render_options is instance_exec'd against `context` (the mailer) when given,
-  # so it can use per-mail helpers; otherwise it's called or returned as-is.
   def resolve_render_options(context = nil)
     value =
       if render_options.respond_to?(:call) && context

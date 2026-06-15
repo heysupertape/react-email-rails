@@ -1,6 +1,6 @@
 {
   "name": "react-email-rails",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Build and send emails using React and Rails",
   "license": "MIT",
   "type": "module",
@@ -50,10 +50,11 @@
     "check:version": "ruby ../scripts/check_version_sync.rb",
     "lint": "oxlint src test bin",
     "format": "oxfmt src test bin",
+    "check:format": "oxfmt --check src test bin",
     "typecheck": "tsgo -p tsconfig.json --noEmit",
     "test": "vitest run",
     "sync:version": "ruby ../scripts/sync_version.rb",
-    "ci": "pnpm run check:version && pnpm build && pnpm lint && pnpm typecheck && pnpm test",
+    "ci": "pnpm run check:version && pnpm run check:format && pnpm build && pnpm lint && pnpm typecheck && pnpm test",
     "prepack": "pnpm run sync:version && pnpm build",
     "prepublishOnly": "pnpm run check:version"
   },

@@ -1,7 +1,6 @@
 class ReactEmailRails::RenderModes::Persistent::Server
   STDERR_LIMIT = 8 * 1024
 
-  # Minimal Process::Status stand-in; only #success? is ever read.
   Status = Data.define(:success) do
     def success? = success
   end
@@ -38,7 +37,6 @@ class ReactEmailRails::RenderModes::Persistent::Server
     release_io
   end
 
-  # Release this process's copy of an inherited child's pipes without signalling the parent-owned process.
   def abandon
     release_io
   rescue IOError
@@ -47,14 +45,12 @@ class ReactEmailRails::RenderModes::Persistent::Server
 
   private
 
-  # Shared by stop (which also kills the process) and abandon (which must not).
   def release_io
     [@stdin, @stdout, @stderr].compact.each { |io| io.close unless io.closed? }
     @stdin = @stdout = @stderr = @wait_thread = @stderr_reader = nil
     @stdout_buffer.clear
   end
 
-  # Run under the mutex; on a broken pipe, stop and retry once (the child respawns).
   def with_retry_on_broken_pipe(&block)
     @mutex.synchronize(&block)
   rescue Errno::EPIPE, IOError
@@ -72,8 +68,6 @@ class ReactEmailRails::RenderModes::Persistent::Server
     response = request(input, timeout:)
     return failure(response["error"].to_s.presence || "render process failed") unless response["ok"]
 
-    # Re-serialize into the same Result.stdout contract the subprocess produces, so
-    # Subprocess#run parses and validates every render uniformly.
     success(JSON.generate(
       {
         protocolVersion: response["protocolVersion"],
