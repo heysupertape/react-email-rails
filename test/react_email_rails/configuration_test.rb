@@ -121,4 +121,22 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
 
     assert_equal({ "html" => { "pretty" => true } }, config.resolve_render_options(context))
   end
+
+  test("live reload url defaults to the vite dev server and strips a trailing slash") do
+    config = ReactEmailRails::Configuration.default
+
+    assert_equal("http://localhost:5173", config.resolve_live_reload_url)
+
+    config.live_reload_url = "http://localhost:6006/"
+    assert_equal("http://localhost:6006", config.resolve_live_reload_url)
+  end
+
+  test("a falsy live reload url disables live reload") do
+    config = ReactEmailRails::Configuration.default
+
+    [nil, false, ""].each do |value|
+      config.live_reload_url = value
+      assert_nil(config.resolve_live_reload_url, "expected #{value.inspect} to disable live reload")
+    end
+  end
 end

@@ -2,10 +2,8 @@ import { loadConfigFromFile, mergeConfig } from "vite"
 
 import { RENDER_PROTOCOL_VERSION, VERSION } from "../dist/version.js"
 
-// Wire contract: must match the Symbol.for(...) keys in src/index.ts.
 const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
 const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
-// Must mirror ReactEmailRailsViteOptions in src/index.ts and the option list in README.md.
 const EMAIL_VITE_CONFIG_KEYS = [
   "assetsInclude",
   "css",
@@ -17,12 +15,15 @@ const EMAIL_VITE_CONFIG_KEYS = [
   "resolve",
 ]
 
-// Emit the version/protocol handshake and exit on --health. Shared by the build and dev bins.
 export function exitIfHealthCheck() {
   if (!process.argv.includes("--health")) return
 
   process.stdout.write(
-    JSON.stringify({ ok: true, protocolVersion: RENDER_PROTOCOL_VERSION, packageVersion: VERSION }),
+    JSON.stringify({
+      ok: true,
+      protocolVersion: RENDER_PROTOCOL_VERSION,
+      packageVersion: VERSION,
+    }),
   )
   process.exit(0)
 }

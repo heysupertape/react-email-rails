@@ -8,8 +8,6 @@ class ReactEmailRails::RenderModes::Subprocess
     end
   end
 
-  # `label` names the render in error messages. `response` reads the reply as `:email`
-  # (RenderedEmail, for render/compose) or `:document` (parsed document, for parse).
   def initialize(payload:, label:, response: :email)
     @payload = payload
     @label = label
@@ -44,7 +42,6 @@ class ReactEmailRails::RenderModes::Subprocess
     end
   end
 
-  # Shared by Persistent#capture so the transport-error messages live in one place.
   def with_capture_rescues
     yield
   rescue Timeout::Error

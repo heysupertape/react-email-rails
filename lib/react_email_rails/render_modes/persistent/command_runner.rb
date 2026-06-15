@@ -1,5 +1,4 @@
 class ReactEmailRails::RenderModes::Persistent::CommandRunner
-  # Eager (not lazy) so concurrent first renders can't each create separate Mutexes.
   @mutex = Mutex.new
 
   class << self
@@ -30,8 +29,6 @@ class ReactEmailRails::RenderModes::Persistent::CommandRunner
       end
     end
 
-    # A forked child inherits the parent's Servers and their open pipes; sharing those pipes
-    # interleaves requests across processes, so drop them without killing the parent's process.
     def reset_after_fork
       return if @owner_pid == Process.pid && @servers
 

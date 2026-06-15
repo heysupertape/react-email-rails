@@ -51,8 +51,6 @@ const { userConfig, plugin, vite } = await loadReactEmailRailsConfig({
   configLoader,
 })
 
-// Same isolation as the dev renderer: keep component resolve/transforms but leave unrelated
-// app plugins out of the email environment so their hooks can't break SSR output.
 const builder = await createBuilder(
   isolatedViteConfig(userConfig, vite, {
     root: root ?? userConfig.root,
