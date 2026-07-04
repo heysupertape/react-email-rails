@@ -77,7 +77,7 @@ class ReactEmailRails::RenderModes::SubprocessTest < ActiveSupport::TestCase
     ReactEmailRails::RenderModes::Persistent::CommandRunner.stop_all
   end
 
-  # Serialization is covered at the ReactEmailRails.render / .compose level.
+  # Serialization is covered at the ReactEmailRails.render level.
   def subprocess(component:, props: {})
     ReactEmailRails::RenderModes::Subprocess.new(
       payload: { component:, props: },

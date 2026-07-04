@@ -44,29 +44,12 @@ module ReactEmailRails
       payload = { component:, props: serialized_props(props) }
       payload[:renderOptions] = render_options if render_options.present?
 
-      perform(payload:, label: component, kind: "email", component:)
-    end
-
-    def compose(type:, document:, context: {}, preview: nil)
-      payload = {
-        kind: "document",
-        type:,
-        document: document.as_json,
-        context: serialized_props(context),
-        preview:,
-      }
-
-      perform(payload:, label: type, kind: "document", type:)
-    end
-
-    def parse(type:, html: nil, markdown: nil, context: {})
-      payload = {
-        kind: "parse",
-        type:,
-        context: serialized_props(context),
-      }.merge(parse_source(html:, markdown:))
-
-      perform(payload:, label: type, response: :document, kind: "parse", type:)
+      instrument(component:) do
+        configuration.resolved_render_mode.new(payload:, label: component).render
+      end
+    rescue ReactEmailRails::RenderError => e
+      configuration.on_render_error&.call(e, component:)
+      raise
     end
 
     def healthy?
@@ -80,38 +63,13 @@ module ReactEmailRails
 
     private
 
-    def perform(payload:, label:, response: :email, **metadata)
-      instrument(**metadata) do
-        configuration.resolved_render_mode.new(payload:, label:, response:).render
-      end
-    rescue ReactEmailRails::RenderError => e
-      configuration.on_render_error&.call(e, **metadata)
-      raise
-    end
-
-    def parse_source(html:, markdown:)
-      if !html.nil? && !markdown.nil?
-        raise(ArgumentError, "ReactEmailRails.parse accepts only one of html: or markdown:")
-      end
-
-      return { html: html.to_s } unless html.nil?
-      return { markdown: markdown.to_s } unless markdown.nil?
-
-      raise(ArgumentError, "ReactEmailRails.parse requires html: or markdown:")
-    end
-
     def serialized_props(value)
       configuration.send(:serialize_props, value)
     end
 
-    def instrument(**metadata)
-      ActiveSupport::Notifications.instrument("render.react-email-rails", **metadata) do |payload|
-        yield.tap do |result|
-          next unless result.respond_to?(:html)
-
-          payload[:html_bytes] = result.html.bytesize
-          payload[:warnings] = result.warnings if result.warnings.present?
-        end
+    def instrument(component:)
+      ActiveSupport::Notifications.instrument("render.react-email-rails", component:) do |payload|
+        yield.tap { |result| payload[:html_bytes] = result.html.bytesize }
       end
     end
   end

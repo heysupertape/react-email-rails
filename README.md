@@ -18,7 +18,6 @@ You get:
 - Vite-powered development rendering
 - A production renderer bundle built during `assets:precompile`
 - Optional persistent rendering for high-volume workers
-- Optional server-side rendering for `@react-email/editor` documents
 
 ## Status
 
@@ -471,12 +470,6 @@ export default function Welcome() {
 }
 ```
 
-### Editor Documents
-
-If your app uses [@react-email/editor](https://react.email/docs/editor) to let users compose emails visually, `ReactEmailRails.compose` can render stored editor documents on the server.
-
-See [Editor rendering](docs/editor.md) for setup and usage.
-
 ## Configuration
 
 Configuration lives in two places:
@@ -580,11 +573,11 @@ ReactEmailRails.configure do |config|
 end
 ```
 
-The callback receives the error plus render context such as `kind:` and `component:`.
+The callback receives the error plus render context such as `component:`.
 
 ### Instrumentation
 
-Every render emits `render.react-email-rails` through [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html). Email payloads include `kind`, `component`, and successful HTML size in `html_bytes`.
+Every render emits `render.react-email-rails` through [ActiveSupport::Notifications](https://guides.rubyonrails.org/active_support_instrumentation.html). Payloads include `component` and successful HTML size in `html_bytes`.
 
 ```ruby
 ActiveSupport::Notifications.subscribe("render.react-email-rails") do |event|
@@ -619,7 +612,6 @@ Server, preview, dependency optimization, and build output settings stay owned b
 | `emails.path` | `"app/javascript/emails"` | Directory containing email components |
 | `emails.extension` | `[".tsx", ".jsx"]` | Component extension, or an array of extensions |
 | `emails.ignore` | `["**/_*", "**/_*/**"]` | Glob patterns ignored under `emails.path` |
-| `documents` | `false` | Optional `@react-email/editor` document renderer discovery; see [Editor rendering](docs/editor.md) |
 | `standalone` | `true` | Inline production renderer bundle dependencies |
 | `vite` | `{}` | Extra email-only Vite config for compilation and resolution |
 
@@ -687,7 +679,7 @@ Production deploys should run the normal Rails asset task:
 bin/rails assets:precompile
 ```
 
-react-email-rails hooks `react_email_rails:build` into `assets:precompile`. The build task loads `reactEmailRails()` options from your Vite config and writes `tmp/react-email-rails/emails.js` with the email component registry. If [Editor rendering](docs/editor.md) is enabled, the bundle also includes document renderers.
+react-email-rails hooks `react_email_rails:build` into `assets:precompile`. The build task loads `reactEmailRails()` options from your Vite config and writes `tmp/react-email-rails/emails.js` with the email component registry.
 
 You can run the renderer build directly:
 
@@ -699,7 +691,7 @@ Production rendering requires that bundle. If it is missing, rendering raises `R
 
 Set `SKIP_REACT_EMAIL_RAILS_BUILD=1` to skip the automatic asset hook. Directly running `bin/rails react_email_rails:build` always attempts the build.
 
-The npm package, Vite, React, and `@react-email/render` must be available when Rails runs `assets:precompile`. If [Editor rendering](docs/editor.md) is enabled, its peer dependencies must be available too.
+The npm package, Vite, React, and `@react-email/render` must be available when Rails runs `assets:precompile`.
 
 The Ruby gem and npm package must stay on the same version. A protocol/version handshake catches mismatched installs and raises an actionable `ReactEmailRails::RenderError`.
 
