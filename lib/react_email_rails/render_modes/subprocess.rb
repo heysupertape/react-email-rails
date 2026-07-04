@@ -8,10 +8,9 @@ class ReactEmailRails::RenderModes::Subprocess
     end
   end
 
-  def initialize(payload:, label:, response: :email)
+  def initialize(payload:, label:)
     @payload = payload
     @label = label
-    @response = response
   end
 
   def render
@@ -20,7 +19,7 @@ class ReactEmailRails::RenderModes::Subprocess
 
   private
 
-  attr_reader(:payload, :label, :response)
+  attr_reader(:payload, :label)
 
   def run
     result = capture(payload_json)
@@ -28,7 +27,7 @@ class ReactEmailRails::RenderModes::Subprocess
 
     body = JSON.parse(result.stdout)
     validate_metadata!(body)
-    build_result(body)
+    build_rendered_email(body)
   rescue JSON::ParserError => e
     raise(render_error("render process returned invalid JSON: #{e.message}"))
   rescue KeyError => e
@@ -86,32 +85,12 @@ class ReactEmailRails::RenderModes::Subprocess
     raise(render_error(ReactEmailRails::RenderProtocol.mismatch_message(body)))
   end
 
-  def build_result(body)
-    response == :document ? build_document(body) : build_rendered_email(body)
-  end
-
   def build_rendered_email(body)
     raise(KeyError.new(key: "html")) unless body.key?("html")
     raise(render_error("render process returned an invalid response: html must be a string")) unless body["html"].is_a?(String)
     raise(render_error("render process returned an invalid response: text must be a string")) if body.key?("text") && !body["text"].is_a?(String)
 
-    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s, warnings: warnings_from(body))
-  end
-
-  def build_document(body)
-    raise(KeyError.new(key: "document")) unless body.key?("document")
-
-    document = body.fetch("document")
-    raise(render_error("parse process returned an invalid response: document must be an object")) unless document.is_a?(Hash)
-
-    document
-  end
-
-  def warnings_from(body)
-    warnings = body["warnings"]
-    return [] unless warnings.is_a?(Array)
-
-    warnings.filter_map { |warning| warning.transform_keys(&:to_sym) if warning.is_a?(Hash) }
+    ReactEmailRails::RenderedEmail.new(html: body.fetch("html"), text: body["text"].to_s)
   end
 
   def render_error(message)

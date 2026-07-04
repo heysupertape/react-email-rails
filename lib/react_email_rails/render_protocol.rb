@@ -1,7 +1,7 @@
 require("json")
 
 module ReactEmailRails
-  RENDER_PROTOCOL_VERSION = 3
+  RENDER_PROTOCOL_VERSION = 4
 
   module RenderProtocol
     extend(self)

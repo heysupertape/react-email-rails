@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- **Breaking:** Remove `@react-email/editor` document rendering to focus the library on component-based Action Mailer emails. `ReactEmailRails.compose`, `ReactEmailRails.parse`, the `documents` Vite plugin option, and the `react-email-rails/document` module are gone, along with the `@react-email/editor`, `@tiptap/core`, `@tiptap/html`, `happy-dom`, and `marked` optional peer dependencies.
+- **Breaking:** `on_render_error` callbacks and the `render.react-email-rails` instrumentation payload no longer include `kind:` (every render is a component email again); `RenderedEmail` no longer has `warnings`.
+- Bump the render protocol to 4 (the renderer no longer accepts document or parse requests). The Ruby gem and npm package must be upgraded together, as before.
+
 ## 0.7.0
 
 - Add development live-reloading for Action Mailer previews. A development-only preview interceptor injects Vite's `@vite/client` into previews, and the `reactEmailRails()` plugin triggers a full reload when an email component changes, so the open preview refreshes on save. Configure the dev-server URL with `live_reload_url`, or set it to a falsy value to disable.

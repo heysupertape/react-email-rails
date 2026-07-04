@@ -39,34 +39,6 @@ export type RenderedEmail = {
   text: string
 }
 
-export type RenderDocumentRequest = {
-  kind: "document"
-  type: string
-  document: unknown
-  context?: unknown
-  preview?: string | null
-}
-
-export type ParseDocumentRequest = {
-  kind: "parse"
-  type: string
-  html?: string
-  markdown?: string
-  context?: unknown
-}
-
-export type DroppedNode = { type: string; count: number }
-
-export type RenderResult = RenderedEmail & { warnings?: DroppedNode[] }
-
-export type ParseResult = { document: unknown }
-
-export type DocumentSupport<Registry = unknown> = {
-  registry: Registry
-  compose: (request: RenderDocumentRequest, registry: Registry) => Promise<RenderResult>
-  parse: (request: ParseDocumentRequest, registry: Registry) => Promise<ParseResult>
-}
-
 type ProtocolMetadata = {
   protocolVersion: number
   packageVersion: string
@@ -118,49 +90,13 @@ export async function renderEmail(
   }
 }
 
-function isDocumentRequest(request: unknown): request is RenderDocumentRequest {
-  return (
-    request !== null &&
-    typeof request === "object" &&
-    "kind" in request &&
-    request.kind === "document"
-  )
-}
-
-function isParseRequest(request: unknown): request is ParseDocumentRequest {
-  return (
-    request !== null && typeof request === "object" && "kind" in request && request.kind === "parse"
-  )
-}
-
 function isHealthRequest(request: unknown): request is HealthRequest {
   return request !== null && typeof request === "object" && "health" in request
 }
 
-async function renderRequest<Registry>(
-  request: RenderRequest | RenderDocumentRequest | ParseDocumentRequest,
-  registry: EmailRegistry,
-  documents: DocumentSupport<Registry> | null,
-): Promise<RenderResult | ParseResult> {
-  if (isDocumentRequest(request)) {
-    if (!documents) throw new Error("React email document rendering is not enabled")
-    return documents.compose(request, documents.registry)
-  }
-
-  if (isParseRequest(request)) {
-    if (!documents) throw new Error("React email document rendering is not enabled")
-    return documents.parse(request, documents.registry)
-  }
-
-  return renderEmail(request, registry)
-}
-
-export async function serve<Registry = unknown>(
-  registry: EmailRegistry,
-  documents: DocumentSupport<Registry> | null = null,
-): Promise<void> {
+export async function serve(registry: EmailRegistry): Promise<void> {
   if (process.argv.includes("--persistent")) {
-    await servePersistent(registry, documents, isolateStdout())
+    await servePersistent(registry, isolateStdout())
     return
   }
 
@@ -171,13 +107,10 @@ export async function serve<Registry = unknown>(
 
   const write = isolateStdout()
   try {
-    const request = JSON.parse(await readStdin()) as
-      | RenderRequest
-      | RenderDocumentRequest
-      | ParseDocumentRequest
+    const request = JSON.parse(await readStdin()) as RenderRequest
     write(
       JSON.stringify({
-        ...(await renderRequest(request, registry, documents)),
+        ...(await renderEmail(request, registry)),
         ...protocolMetadata(),
       }),
     )
@@ -208,9 +141,8 @@ function readStdin(): Promise<string> {
   })
 }
 
-async function servePersistent<Registry>(
+async function servePersistent(
   registry: EmailRegistry,
-  documents: DocumentSupport<Registry> | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   process.stdin.setEncoding("utf8")
@@ -224,31 +156,26 @@ async function servePersistent<Registry>(
       const line = pending.slice(0, separator)
       pending = pending.slice(separator + 1)
 
-      if (line.trim()) await writePersistentResponse(line, registry, documents, write)
+      if (line.trim()) await writePersistentResponse(line, registry, write)
       separator = pending.indexOf("\n")
     }
   }
 }
 
-async function writePersistentResponse<Registry>(
+async function writePersistentResponse(
   line: string,
   registry: EmailRegistry,
-  documents: DocumentSupport<Registry> | null,
   write: (chunk: string) => boolean,
 ): Promise<void> {
   try {
-    const request = JSON.parse(line) as
-      | RenderRequest
-      | RenderDocumentRequest
-      | ParseDocumentRequest
-      | HealthRequest
+    const request = JSON.parse(line) as RenderRequest | HealthRequest
     if (isHealthRequest(request)) {
       write(`${JSON.stringify(okResponse())}\n`)
       return
     }
 
     write(
-      `${JSON.stringify({ ok: true, ...(await renderRequest(request, registry, documents)), ...protocolMetadata() })}\n`,
+      `${JSON.stringify({ ok: true, ...(await renderEmail(request, registry)), ...protocolMetadata() })}\n`,
     )
   } catch (error) {
     write(

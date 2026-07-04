@@ -313,75 +313,6 @@ describe("reactEmailRails plugin", () => {
     expect(source).not.toContain("renderOptions")
   })
 
-  it("never references the document module when documents are disabled", () => {
-    const plugin = reactEmailRails()
-    const source = loadVirtualServer(plugin)
-
-    // The editor module stays out of the email build graph and render path.
-    expect(source).not.toContain("react-email-rails/document")
-    expect(source).not.toContain("documentRegistry")
-    expect(source).toContain("export const run = () => serve(registry)")
-  })
-
-  it("treats documents: false as disabled", () => {
-    const plugin = reactEmailRails({ documents: false })
-    const source = loadVirtualServer(plugin)
-
-    expect(source).not.toContain("react-email-rails/document")
-    expect(source).toContain("export const run = () => serve(registry)")
-  })
-
-  it("wires a second registry and the document module when documents are enabled", () => {
-    const plugin = reactEmailRails({ documents: true })
-    const source = loadVirtualServer(plugin)
-
-    expect(source).toContain(
-      'import { composeDocument, createParseDocument } from "react-email-rails/document"',
-    )
-    expect(source).toContain('import { generateJSON } from "@tiptap/html"')
-    // marked is installed in this workspace, so the markdown renderer is wired in too.
-    expect(source).toContain('import { marked } from "marked"')
-    expect(source).toContain('"/app/javascript/documents/**/*{.tsx,.ts}"')
-    expect(source).toContain('[".tsx",".ts"], "/app/javascript/documents/")')
-    expect(source).toContain(
-      "export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: createParseDocument(generateJSON, (markdown) => marked.parse(markdown)) })",
-    )
-    // The email registry is still built exactly as before.
-    expect(source).toContain('"/app/javascript/emails/**/*{.tsx,.jsx}"')
-  })
-
-  it("accepts a documents string shorthand for the directory", () => {
-    const plugin = reactEmailRails({ documents: "app/newsletters" })
-    const source = loadVirtualServer(plugin)
-
-    expect(source).toContain('"/app/newsletters/**/*{.tsx,.ts}"')
-  })
-
-  it("exposes normalized document metadata for Rails generators", () => {
-    const plugin = reactEmailRails({
-      documents: { path: "/app/frontend/documents/", extension: "ts" },
-    })
-    const metadata = (plugin as unknown as Record<symbol, unknown>)[
-      Symbol.for("react-email-rails.config")
-    ]
-
-    expect(metadata).toMatchObject({
-      documents: {
-        path: "app/frontend/documents",
-        extensions: [".ts"],
-      },
-    })
-  })
-
-  it("omits document metadata when documents are disabled", () => {
-    const plugin = reactEmailRails()
-    const metadata = (plugin as unknown as Record<symbol, unknown>)[
-      Symbol.for("react-email-rails.config")
-    ] as { documents?: unknown }
-
-    expect(metadata.documents).toBeUndefined()
-  })
-
   it("normalizes extension options and strips the full configured extension", () => {
     expect(
       toComponentName(
@@ -481,22 +412,6 @@ describe("reactEmailRails preview live reload", () => {
       { type: "full-reload" },
     ])
     expect(handleHotUpdate(plugin, "/project/app/javascript/emails/welcome.tsx").sent).toEqual([])
-  })
-
-  it("reloads for document changes when documents are enabled", () => {
-    const plugin = reactEmailRails({ documents: true })
-
-    expect(
-      handleHotUpdate(plugin, "/project/app/javascript/documents/newsletter.tsx").sent,
-    ).toEqual([{ type: "full-reload" }])
-  })
-
-  it("ignores document changes when documents are disabled", () => {
-    const plugin = reactEmailRails()
-
-    expect(
-      handleHotUpdate(plugin, "/project/app/javascript/documents/newsletter.tsx").sent,
-    ).toEqual([])
   })
 })
 

@@ -1,5 +1,3 @@
-import { createRequire } from "node:module"
-
 import type { ConfigEnv, Plugin, UserConfig } from "vite"
 
 export type EmailsOption =
@@ -12,7 +10,6 @@ export type EmailsOption =
 
 export type ReactEmailRailsOptions = {
   emails?: EmailsOption
-  documents?: EmailsOption | boolean
   standalone?: boolean
   vite?: ReactEmailRailsViteOptions
 }
@@ -32,7 +29,6 @@ type SourceMetadata = {
 
 type PluginMetadata = {
   emails: SourceMetadata
-  documents?: SourceMetadata
   standalone: boolean
   outDir: string
   bundleFile: string
@@ -49,8 +45,6 @@ type Source = {
 const DEFAULT_IGNORE = ["**/_*", "**/_*/**"]
 const DEFAULT_EMAIL_PATH = "app/javascript/emails"
 const DEFAULT_EMAIL_EXTENSIONS = [".tsx", ".jsx"]
-const DEFAULT_DOCUMENT_PATH = "app/javascript/documents"
-const DEFAULT_DOCUMENT_EXTENSIONS = [".ts", ".tsx"]
 
 const VIRTUAL_SERVER = "virtual:react-email-rails/server"
 const VIRTUAL_MAIN = "virtual:react-email-rails/main"
@@ -63,23 +57,18 @@ const CONFIG_SYMBOL = Symbol.for("react-email-rails.config")
 const VITE_CONFIG_SYMBOL = Symbol.for("react-email-rails.vite")
 const OUT_DIR = "tmp/react-email-rails"
 const BUNDLE_FILE = "emails.js"
-const require = createRequire(import.meta.url)
 
 const WS_NATIVE_ADDON_OPT_OUT = {
   "process.env.WS_NO_BUFFER_UTIL": "'1'",
   "process.env.WS_NO_UTF_8_VALIDATE": "'1'",
 }
 
-function normalizeSource(
-  option: EmailsOption | undefined,
-  defaultPath: string,
-  defaultExtensions: string[],
-): Source {
+function normalizeSource(option: EmailsOption | undefined): Source {
   const source = typeof option === "string" ? { path: option } : (option ?? {})
-  const path = (source.path ?? defaultPath).replace(/^\/|\/$/g, "")
+  const path = (source.path ?? DEFAULT_EMAIL_PATH).replace(/^\/|\/$/g, "")
   const rawExtensions =
     source.extension === undefined
-      ? defaultExtensions
+      ? DEFAULT_EMAIL_EXTENSIONS
       : Array.isArray(source.extension)
         ? source.extension
         : [source.extension]
@@ -115,30 +104,8 @@ function isWithinSource(file: string, root: string, relativeDir: string): boolea
   return normalizePath(file).startsWith(base)
 }
 
-function optionalPeersAvailable(specifiers: string[]): boolean {
-  return specifiers.every((specifier) => {
-    try {
-      require.resolve(specifier)
-      return true
-    } catch {
-      return false
-    }
-  })
-}
-
 export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
-  const emailSource = normalizeSource(options.emails, DEFAULT_EMAIL_PATH, DEFAULT_EMAIL_EXTENSIONS)
-  const documentSource =
-    options.documents === undefined || options.documents === false
-      ? null
-      : normalizeSource(
-          options.documents === true ? undefined : options.documents,
-          DEFAULT_DOCUMENT_PATH,
-          DEFAULT_DOCUMENT_EXTENSIONS,
-        )
-  const liveReloadDirs = [emailSource.path, documentSource?.path].filter((path): path is string =>
-    Boolean(path),
-  )
+  const emailSource = normalizeSource(options.emails)
   const standalone = options.standalone ?? true
 
   const plugin: Plugin = {
@@ -156,37 +123,11 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       filter: { id: VIRTUAL_MODULE_PATTERN },
       handler(id) {
         if (id === RESOLVED_SERVER) {
-          const lines = [`import { buildRegistry, serve } from "react-email-rails/runtime"`]
-          const parserPeersAvailable =
-            documentSource && optionalPeersAvailable(["@tiptap/html", "happy-dom"])
-          const markdownPeerAvailable = parserPeersAvailable && optionalPeersAvailable(["marked"])
-
-          if (documentSource) {
-            lines.push(
-              parserPeersAvailable
-                ? `import { composeDocument, createParseDocument } from "react-email-rails/document"`
-                : `import { composeDocument, parseDocument } from "react-email-rails/document"`,
-            )
-            if (parserPeersAvailable) {
-              lines.push(`import { generateJSON } from "@tiptap/html"`)
-              if (markdownPeerAvailable) lines.push(`import { marked } from "marked"`)
-            }
-          }
-
-          lines.push(
+          return [
+            `import { buildRegistry, serve } from "react-email-rails/runtime"`,
             `const registry = buildRegistry(import.meta.glob(${emailSource.globArg}), ${JSON.stringify(emailSource.extensions)}, ${JSON.stringify(emailSource.root)})`,
-          )
-
-          if (documentSource) {
-            lines.push(
-              `const documentRegistry = buildRegistry(import.meta.glob(${documentSource.globArg}), ${JSON.stringify(documentSource.extensions)}, ${JSON.stringify(documentSource.root)})`,
-              `export const run = () => serve(registry, { registry: documentRegistry, compose: composeDocument, parse: ${parserPeersAvailable ? `createParseDocument(generateJSON${markdownPeerAvailable ? ", (markdown) => marked.parse(markdown)" : ""})` : "parseDocument"} })`,
-            )
-          } else {
-            lines.push(`export const run = () => serve(registry)`)
-          }
-
-          return lines.join("\n")
+            `export const run = () => serve(registry)`,
+          ].join("\n")
         }
 
         if (id === RESOLVED_MAIN) {
@@ -197,7 +138,7 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
 
     hotUpdate(options) {
       const root = options.server.config.root
-      if (!liveReloadDirs.some((dir) => isWithinSource(options.file, root, dir))) return
+      if (!isWithinSource(options.file, root, emailSource.path)) return
       if (this.environment.name !== "client") return
 
       this.environment.hot.send({ type: "full-reload" })
@@ -232,13 +173,6 @@ export function reactEmailRails(options: ReactEmailRailsOptions = {}): Plugin {
       extensions: emailSource.extensions,
       ignore: emailSource.ignore,
     },
-    ...(documentSource && {
-      documents: {
-        path: documentSource.path,
-        extensions: documentSource.extensions,
-        ignore: documentSource.ignore,
-      },
-    }),
     standalone,
     outDir: OUT_DIR,
     bundleFile: BUNDLE_FILE,
@@ -264,6 +198,5 @@ export type {
   Message,
   RenderedEmail,
   RenderRequest,
-  RenderResult,
 } from "./runtime.js"
 export { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"

@@ -1,7 +1,6 @@
-import { execFile as execFileCallback, spawn } from "node:child_process"
+import { execFile as execFileCallback } from "node:child_process"
 import {
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -21,31 +20,8 @@ import { RENDER_PROTOCOL_VERSION } from "../src/version"
 
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 const runtimeEntry = join(pkgRoot, "src/runtime.ts")
-const documentEntry = join(pkgRoot, "src/document.ts")
 const fixtures: string[] = []
 const execFile = promisify(execFileCallback)
-
-// Drive a built bundle in one-shot mode: request in on stdin, JSON out on stdout.
-function renderWithBundle(bundlePath: string, request: unknown, cwd: string): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("node", [bundlePath], { cwd })
-    let stdout = ""
-    let stderr = ""
-    child.stdout.on("data", (chunk) => (stdout += chunk))
-    child.stderr.on("data", (chunk) => (stderr += chunk))
-    child.on("error", reject)
-    child.on("close", (code) => {
-      if (code !== 0) return reject(new Error(stderr || `bundle exited with ${code}`))
-      try {
-        resolve(JSON.parse(stdout))
-      } catch {
-        reject(new Error(`bundle returned invalid JSON: ${stdout}\n${stderr}`))
-      }
-    })
-    child.stdin.write(JSON.stringify(request))
-    child.stdin.end()
-  })
-}
 
 afterAll(() => {
   for (const dir of fixtures) rmSync(dir, { recursive: true, force: true })
@@ -195,108 +171,6 @@ describe("react-email-rails-build", () => {
     const { stdout } = await execFile("node", [isolatedBundlePath, "--health"], { cwd: isolated })
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, protocolVersion: RENDER_PROTOCOL_VERSION })
   }, 60_000)
-
-  it("renders and parses editor documents from a standalone bundle with tiptap inlined", async () => {
-    const root = mkdtempSync(join(pkgRoot, "node_modules", ".rer-build-bin-documents-"))
-    const isolated = mkdtempSync(join(tmpdir(), "rer-documents-"))
-    fixtures.push(root, isolated)
-
-    mkdirSync(join(root, "app/frontend/emails/account_mailer"), { recursive: true })
-    mkdirSync(join(root, "app/frontend/documents"), { recursive: true })
-    writeFileSync(
-      join(root, "vite.config.ts"),
-      [
-        `import { defineConfig } from "vite"`,
-        `import { reactEmailRails } from ${JSON.stringify(
-          pathToFileURL(join(pkgRoot, "dist/index.js")).href,
-        )}`,
-        ``,
-        `export default defineConfig({`,
-        `  resolve: { alias: {`,
-        `    "react-email-rails/runtime": ${JSON.stringify(runtimeEntry)},`,
-        `    "react-email-rails/document": ${JSON.stringify(documentEntry)},`,
-        `  } },`,
-        `  plugins: [reactEmailRails({`,
-        `    emails: "app/frontend/emails",`,
-        `    documents: "app/frontend/documents",`,
-        `  })],`,
-        `})`,
-        ``,
-      ].join("\n"),
-    )
-    // An email still has to build alongside the document renderer.
-    writeFileSync(
-      join(root, "app/frontend/emails/account_mailer/created.tsx"),
-      [
-        `import { createElement } from "react"`,
-        ``,
-        `export default function Created() {`,
-        `  return createElement("p", null, "Standalone")`,
-        `}`,
-        ``,
-      ].join("\n"),
-    )
-    writeFileSync(
-      join(root, "app/frontend/documents/broadcast.ts"),
-      [
-        `import { StarterKit } from "@react-email/editor/extensions"`,
-        `import { EmailTheming } from "@react-email/editor/plugins"`,
-        ``,
-        `export function buildExtensions() {`,
-        `  return [StarterKit, EmailTheming]`,
-        `}`,
-        ``,
-      ].join("\n"),
-    )
-
-    await execFile("node", [join(pkgRoot, "bin/build.mjs")], { cwd: root })
-
-    // Copy the whole output dir (emails.js + chunks) somewhere without node_modules to prove
-    // tiptap/editor/prosemirror are inlined.
-    cpSync(join(root, "tmp/react-email-rails"), isolated, { recursive: true })
-    const isolatedBundlePath = join(isolated, "emails.js")
-
-    const document = {
-      type: "doc",
-      content: [
-        { type: "globalContent", attrs: {} },
-        {
-          type: "heading",
-          attrs: { level: 1 },
-          content: [{ type: "text", text: "Broadcast headline" }],
-        },
-      ],
-    }
-    const response = (await renderWithBundle(
-      isolatedBundlePath,
-      { kind: "document", type: "broadcast", document, preview: "Inbox preview" },
-      isolated,
-    )) as { html: string; text: string; protocolVersion: number }
-
-    expect(response.protocolVersion).toBe(RENDER_PROTOCOL_VERSION)
-    expect(response.html).toContain("Broadcast headline")
-    expect(response.html).toContain("Inbox preview")
-    expect(response.text).toMatch(/broadcast headline/i)
-
-    const parsed = (await renderWithBundle(
-      isolatedBundlePath,
-      { kind: "parse", type: "broadcast", html: "<h1>Parsed headline</h1><p>From HTML</p>" },
-      isolated,
-    )) as { document: { type: string; content: { type: string }[] }; protocolVersion: number }
-
-    expect(parsed.protocolVersion).toBe(RENDER_PROTOCOL_VERSION)
-    expect(parsed.document.type).toBe("doc")
-    expect(parsed.document.content.some((node) => node.type === "heading")).toBe(true)
-
-    const rendered = (await renderWithBundle(
-      isolatedBundlePath,
-      { kind: "document", type: "broadcast", document: parsed.document },
-      isolated,
-    )) as { html: string }
-
-    expect(rendered.html).toContain("Parsed headline")
-    expect(rendered.html).toContain("From HTML")
-  }, 90_000)
 })
 
 function readJavaScriptOutput(dir: string): string {
