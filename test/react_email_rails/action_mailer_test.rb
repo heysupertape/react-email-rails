@@ -43,12 +43,12 @@ class ReactEmailTestMailerPreview < ActionMailer::Preview
 end
 
 class SharedPropsMailer < ApplicationMailer
-  react_email_share(brand: "Acme")
-  react_email_share(total: -> { compute_total })
-  react_email_share do
+  react_share(brand: "Acme")
+  react_share(total: -> { compute_total })
+  react_share do
     { action: action_name }
   end
-  react_email_share(only: [:promo]) do
+  react_share(only: [:promo]) do
     { promo: true }
   end
 
@@ -73,7 +73,7 @@ class SharedPropsMailer < ApplicationMailer
   end
 
   def with_instance_share
-    react_email_share(notice: "instance")
+    react_share(notice: "instance")
     mail(react: { title: "Instance" }, to: "a@example.com", subject: "Instance")
   end
 
@@ -83,7 +83,7 @@ class SharedPropsMailer < ApplicationMailer
 end
 
 class ChildSharedPropsMailer < SharedPropsMailer
-  react_email_share(scope: "child")
+  react_share(scope: "child")
 
   def show
     mail(react: { title: "Child" }, to: "a@example.com", subject: "Child")
@@ -91,7 +91,7 @@ class ChildSharedPropsMailer < SharedPropsMailer
 end
 
 class DeepMergeMailer < ApplicationMailer
-  react_email_share do
+  react_share do
     { settings: { theme: "light", locale: "en" } }
   end
 
@@ -367,7 +367,7 @@ class ReactEmailRails::SharedPropsTest < ActiveSupport::TestCase
     assert_equal({ "brand" => "Acme", "total" => 42, "action" => "bare" }, props)
   end
 
-  test("react_email_share inside an action shares props for that mail") do
+  test("react_share inside an action shares props for that mail") do
     props = props_for { SharedPropsMailer.with_instance_share.message }
 
     assert_equal("instance", props["notice"])

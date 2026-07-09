@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+
+- **Breaking:** Rename `react_email_share` to `react_share`, matching the `react:` key used in `mail`. Update any `react_email_share` calls in your mailers to `react_share`.
+
 ## 0.8.0
 
 - **Breaking:** Remove `@react-email/editor` document rendering to focus the library on component-based Action Mailer emails. `ReactEmailRails.compose`, `ReactEmailRails.parse`, the `documents` Vite plugin option, and the `react-email-rails/document` module are gone, along with the `@react-email/editor`, `@tiptap/core`, `@tiptap/html`, `happy-dom`, and `marked` optional peer dependencies.
