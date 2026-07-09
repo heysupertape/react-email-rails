@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- **Breaking:** Remove the instance-level `react_share` helper (calling `react_share` from within an action before `mail`). Pass per-mail props directly in the `react:` hash instead; use the class-level `react_share` (with `only`/`except`/`if`/`unless`) for conditional sharing.
+
 ## 0.9.0
 
 - **Breaking:** Rename `react_email_share` to `react_share`, matching the `react:` key used in `mail`. Update any `react_email_share` calls in your mailers to `react_share`.

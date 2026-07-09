@@ -72,11 +72,6 @@ class SharedPropsMailer < ApplicationMailer
     mail(react: "shared_props_mailer/show", props: { title: "Explicit" }, to: "a@example.com", subject: "Explicit")
   end
 
-  def with_instance_share
-    react_share(notice: "instance")
-    mail(react: { title: "Instance" }, to: "a@example.com", subject: "Instance")
-  end
-
   private
 
   def compute_total = 42
@@ -365,13 +360,6 @@ class ReactEmailRails::SharedPropsTest < ActiveSupport::TestCase
     props = props_for { SharedPropsMailer.bare.message }
 
     assert_equal({ "brand" => "Acme", "total" => 42, "action" => "bare" }, props)
-  end
-
-  test("react_share inside an action shares props for that mail") do
-    props = props_for { SharedPropsMailer.with_instance_share.message }
-
-    assert_equal("instance", props["notice"])
-    assert_equal("Instance", props["title"])
   end
 
   test("subclasses inherit shared props and can add their own") do
