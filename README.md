@@ -280,15 +280,15 @@ To change naming globally, override `component_path_resolver` in your [Rails con
 
 ### Shared Props
 
-Use `react_email_share` to merge props into every `react:` email for a mailer and its subclasses:
+Use `react_share` to merge props into every `react:` email for a mailer and its subclasses:
 
 ```ruby
 class MarketingMailer < ApplicationMailer
-  react_email_share app_name: "Acme"
+  react_share app_name: "Acme"
 
-  react_email_share unread_count: -> { params[:account]&.unread_count }
+  react_share unread_count: -> { params[:account]&.unread_count }
 
-  react_email_share do
+  react_share do
     { brand: { name: "Acme", url: marketing_url } }
   end
 end
@@ -310,14 +310,14 @@ Shared props work with `react:` hashes, `react: true`, and explicit `react: "com
 
 ### Conditional Shared Props
 
-`react_email_share` accepts the same filter options as `before_action`: `only`, `except`, `if`, and `unless`.
+`react_share` accepts the same filter options as `before_action`: `only`, `except`, `if`, and `unless`.
 
 ```ruby
-react_email_share only: [:welcome, :reactivation] do
+react_share only: [:welcome, :reactivation] do
   { promotion: params.fetch(:promotion) }
 end
 
-react_email_share if: :account_active? do
+react_share if: :account_active? do
   { account: { name: params.fetch(:account).name } }
 end
 ```
@@ -328,7 +328,7 @@ You can also share props inside an action before calling `mail`:
 def welcome
   account = params.fetch(:account)
 
-  react_email_share notice: "Thanks for joining!"
+  react_share notice: "Thanks for joining!"
 
   mail(
     to: account.email,
@@ -345,7 +345,7 @@ Shared props are merged shallowly by default. That means a per-mail prop replace
 Pass `deep_merge: true` to merge nested hashes instead:
 
 ```ruby
-react_email_share do
+react_share do
   { settings: { theme: "light", locale: "en" } }
 end
 

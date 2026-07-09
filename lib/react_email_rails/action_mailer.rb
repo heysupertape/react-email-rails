@@ -12,7 +12,7 @@ module ReactEmailRails::ActionMailer
       self.react_email_use_instance_props = true
     end
 
-    def react_email_share(hash = nil, **props, &block)
+    def react_share(hash = nil, **props, &block)
       options = props.slice(*SHARED_FILTER_OPTIONS)
       data = hash || props.except(*SHARED_FILTER_OPTIONS)
 
@@ -22,7 +22,7 @@ module ReactEmailRails::ActionMailer
     end
   end
 
-  def react_email_share(hash = nil, **props, &block)
+  def react_share(hash = nil, **props, &block)
     react_email_append_shared(hash || props, block)
   end
 
