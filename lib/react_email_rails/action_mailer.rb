@@ -22,10 +22,6 @@ module ReactEmailRails::ActionMailer
     end
   end
 
-  def react_share(hash = nil, **props, &block)
-    react_email_append_shared(hash || props, block)
-  end
-
   def mail(headers = {}, &block)
     return super unless headers.is_a?(Hash)
     return super if headers.empty? && @_mail_was_called

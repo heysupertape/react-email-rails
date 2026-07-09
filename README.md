@@ -322,22 +322,6 @@ react_share if: :account_active? do
 end
 ```
 
-You can also share props inside an action before calling `mail`:
-
-```ruby
-def welcome
-  account = params.fetch(:account)
-
-  react_share notice: "Thanks for joining!"
-
-  mail(
-    to: account.email,
-    subject: "Welcome",
-    react: { account: account.as_json(only: [:name]) },
-  )
-end
-```
-
 ### Deep Merging Shared Props
 
 Shared props are merged shallowly by default. That means a per-mail prop replaces a shared prop with the same name.
