@@ -42,12 +42,12 @@
     "react-email-rails-dev": "./bin/dev.mjs"
   },
   "scripts": {
-    "build": "tsgo -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "check:version": "ruby ../scripts/check_version_sync.rb",
     "lint": "oxlint src test bin",
     "format": "oxfmt src test bin",
     "check:format": "oxfmt --check src test bin",
-    "typecheck": "tsgo -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "sync:version": "ruby ../scripts/sync_version.rb",
     "ci": "pnpm run check:version && pnpm run check:format && pnpm build && pnpm lint && pnpm typecheck && pnpm test",
@@ -66,12 +66,12 @@
     "@react-email/render": "^2.0.8",
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.15",
-    "@typescript/native-preview": "7.0.0-dev.20260704.1",
     "oxfmt": "^0.57.0",
     "oxlint": "^1.67.0",
     "oxlint-tsgolint": "^0.24.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "typescript": "^7.0.2",
     "vite": "^8.0.14",
     "vitest": "^4.1.7"
   }
