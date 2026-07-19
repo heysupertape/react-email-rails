@@ -27,4 +27,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency("actionmailer", ">= 7.1", "< 9.0")
   spec.add_dependency("activesupport", ">= 7.1", "< 9.0")
   spec.add_dependency("railties", ">= 7.1", "< 9.0")
+
+  spec.add_development_dependency("rubocop-minitest")
+  spec.add_development_dependency("rubocop-performance")
+  spec.add_development_dependency("rubocop-rails")
+  spec.add_development_dependency("rubocop-shopify")
 end

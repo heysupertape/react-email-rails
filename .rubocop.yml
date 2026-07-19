@@ -25,6 +25,12 @@ Naming/FileName:
   Exclude:
     - "lib/react-email-rails.rb"
 
+# Dev tooling lives in the gemspec so every appraisal gemfile in gemfiles/
+# (each `gemspec path: ".."`) inherits it and `bundle exec rubocop` works
+# across the whole CI matrix. rubocop-shopify 3.0 enabled this cop by default.
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
 Style/ClassAndModuleChildren:
   EnforcedStyle: compact
 
