@@ -32,7 +32,7 @@ class ActiveSupport::TestCase
 
   # Shared stub-renderer building blocks (RENDER_METADATA mirrors the Ruby<->JS handshake).
   RUBY = RbConfig.ruby
-  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}"
+  RENDER_METADATA = "protocolVersion: #{ReactEmailRails::RENDER_PROTOCOL_VERSION}, packageVersion: #{ReactEmailRails::VERSION.inspect}".freeze
 
   # Echoes the request payload back as the HTML body so tests can assert on it.
   ECHO_INPUT = [

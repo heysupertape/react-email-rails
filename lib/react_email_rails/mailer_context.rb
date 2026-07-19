@@ -33,8 +33,8 @@ class ReactEmailRails::MailerContext
   def message_context
     message = mailer.message
 
-    MESSAGE_FIELDS.each_with_object({}) do |field, context|
-      context[field.to_s] = message.public_send(field)
+    MESSAGE_FIELDS.to_h do |field|
+      [field.to_s, message.public_send(field)]
     end
   end
 end
