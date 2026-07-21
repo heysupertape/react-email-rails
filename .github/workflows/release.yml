@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     name: Verify release
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
         with:
@@ -54,7 +54,7 @@ jobs:
 
   publish:
     name: Publish packages
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: verify
     permissions:
       contents: write
