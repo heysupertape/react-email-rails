@@ -12,6 +12,10 @@ updates:
         update-types:
           - minor
           - patch
+      bundler-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /vite
     schedule:
@@ -24,6 +28,10 @@ updates:
         update-types:
           - minor
           - patch
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -36,3 +44,7 @@ updates:
         update-types:
           - minor
           - patch
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
