@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1
+
+- Republish of 0.11.0 with no code changes. The 0.11.0 npm package was never published: npm provenance publishing requires GitHub-hosted runners, so the release workflow's publish job now runs on one. Do not use gem 0.11.0; it has no matching npm package.
+
 ## 0.11.0
 
 - Generated applications now use React Email 6's unified `react-email` package for email components instead of `@react-email/components`.
