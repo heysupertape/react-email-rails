@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.0
 
 - Generated applications now use React Email 6's unified `react-email` package for email components instead of `@react-email/components`.
 - `@react-email/render` is now a runtime dependency of the `react-email-rails` npm package instead of a peer dependency, so applications no longer install it directly. The npm package now declares `react-dom` as a peer dependency alongside `react`, matching what the renderer already required at runtime.
