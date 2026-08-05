@@ -38,7 +38,7 @@ The supported Ruby, Rails, Node, React, and Vite versions are tested in CI. Plea
 | Node | 20.19+ |
 | Vite | 7 or 8 |
 | React | 18 or 19 |
-| `@react-email/render` | 2.x |
+| React Email | 6.x |
 
 We recommend [rails_vite](https://github.com/skryukov/rails_vite/) for Vite in Rails apps.
 
@@ -71,7 +71,7 @@ After installation, the normal Rails flow applies:
 If you prefer to wire things up yourself, install the npm package and React Email dependencies:
 
 ```sh
-npm i react-email-rails @react-email/render @react-email/components react react-dom
+npm i react-email-rails react-email react react-dom
 ```
 
 Use the equivalent command for pnpm, Yarn, or Bun if your app uses a different package manager.
@@ -128,7 +128,7 @@ Then edit the generated component:
 
 ```tsx
 // app/javascript/emails/account_mailer/welcome.tsx
-import { Body, Container, Html, Text } from "@react-email/components"
+import { Body, Container, Html, Text } from "react-email"
 
 type WelcomeProps = {
   account: {
@@ -373,7 +373,7 @@ Action Mailer layouts are not applied to `react:` emails. In React Email, layout
 
 ```tsx
 // app/javascript/emails/_components/email_layout.tsx
-import { Body, Container, Html } from "@react-email/components"
+import { Body, Container, Html } from "react-email"
 import type { ReactNode } from "react"
 
 type EmailLayoutProps = {
@@ -393,7 +393,7 @@ export function EmailLayout({ children }: EmailLayoutProps) {
 
 ```tsx
 // app/javascript/emails/account_mailer/welcome.tsx
-import { Text } from "@react-email/components"
+import { Text } from "react-email"
 import { EmailLayout } from "../_components/email_layout"
 
 export default function Welcome() {
@@ -617,7 +617,7 @@ Production rendering requires that bundle. If it is missing, rendering raises `R
 
 Set `SKIP_REACT_EMAIL_RAILS_BUILD=1` to skip the automatic asset hooks. Directly running `bin/rails react_email_rails:build` always attempts the build.
 
-The npm package, Vite, React, and `@react-email/render` must be available when Rails runs `assets:precompile`.
+The npm package, Vite, and React must be available when Rails runs `assets:precompile`.
 
 The Ruby gem and npm package must stay on the same version. A protocol/version handshake catches mismatched installs and raises an actionable `ReactEmailRails::RenderError`.
 

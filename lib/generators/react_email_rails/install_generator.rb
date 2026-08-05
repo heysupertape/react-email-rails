@@ -7,8 +7,7 @@ module ReactEmailRails::Generators; end
 class ReactEmailRails::Generators::InstallGenerator < Rails::Generators::Base
   JAVASCRIPT_PACKAGES = [
     "react-email-rails",
-    "@react-email/render",
-    "@react-email/components",
+    "react-email",
     "react",
     "react-dom",
   ].freeze
