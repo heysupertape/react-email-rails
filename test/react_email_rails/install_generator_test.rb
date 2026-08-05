@@ -42,8 +42,7 @@ class ReactEmailRails::InstallGeneratorTest < Rails::Generators::TestCase
       JSON.pretty_generate(
         "dependencies" => {
           "react-email-rails" => "^0.1.0",
-          "@react-email/render" => "^2.0.0",
-          "@react-email/components" => "^1.0.0",
+          "react-email" => "^6.0.0",
           "react" => "^19.0.0",
           "react-dom" => "^19.0.0",
         },
@@ -54,5 +53,24 @@ class ReactEmailRails::InstallGeneratorTest < Rails::Generators::TestCase
     run_generator(["--skip-vite"])
 
     assert_file("package.json", /"react-email-rails"/)
+  end
+
+  test("installs the unified react-email package instead of the split React Email packages") do
+    write_destination_file(
+      "package.json",
+      JSON.pretty_generate("dependencies" => {}, "packageManager" => "pnpm@10.34.1"),
+    )
+
+    commands = []
+    instance = generator(["--skip-vite"])
+    instance.define_singleton_method(:run) { |command, *| commands << command }
+    capture(:stdout) { instance.invoke_all }
+
+    assert_equal(["pnpm add react-email-rails react-email react react-dom"], commands)
+
+    packages = commands.fetch(0).split(" ").drop(2)
+    assert_includes(packages, "react-email")
+    assert_not_includes(packages, "@react-email/components")
+    assert_not_includes(packages, "@react-email/render")
   end
 end

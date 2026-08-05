@@ -16,6 +16,7 @@ class ReactEmailRails::EmailGeneratorTest < Rails::Generators::TestCase
     assert_file("app/mailers/account_mailer.rb", /def created/)
     assert_file("app/mailers/account_mailer.rb", /mail to: "to@example.org", react: true/)
     assert_file("app/javascript/emails/account_mailer/created.tsx", /export default function Created/)
+    assert_file("app/javascript/emails/account_mailer/created.tsx", /from "react-email"/)
     assert_file("app/javascript/emails/account_mailer/invited.tsx", /AccountMailer#invited/)
     assert_file("test/mailers/account_mailer_test.rb", /ReactEmailRails.stub\(:render/)
     assert_file("test/mailers/previews/account_mailer_preview.rb", /AccountMailer.created/)

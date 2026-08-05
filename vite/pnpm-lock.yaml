@@ -7,10 +7,11 @@ settings:
 importers:
 
   .:
-    devDependencies:
+    dependencies:
       '@react-email/render':
-        specifier: ^2.0.8
+        specifier: ^2.1.0
         version: 2.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+    devDependencies:
       '@types/node':
         specifier: ^26.0.0
         version: 26.1.2

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Generated applications now use React Email 6's unified `react-email` package for email components instead of `@react-email/components`.
+- `@react-email/render` is now a runtime dependency of the `react-email-rails` npm package instead of a peer dependency, so applications no longer install it directly. The npm package now declares `react-dom` as a peer dependency alongside `react`, matching what the renderer already required at runtime.
+
 ## 0.10.0
 
 - **Breaking:** Remove the instance-level `react_share` helper (calling `react_share` from within an action before `mail`). Pass per-mail props directly in the `react:` hash instead; use the class-level `react_share` (with `only`/`except`/`if`/`unless`) for conditional sharing.

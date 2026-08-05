@@ -1,4 +1,4 @@
-import { Body, Container, Heading, Html, Text } from "@react-email/components"
+import { Body, Container, Heading, Html, Text } from "react-email"
 
 export default function <%= @component_name %>() {
   return (
