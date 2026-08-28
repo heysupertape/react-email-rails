@@ -114,7 +114,9 @@ class ReactEmailRails::Renderer::Child
       if remaining <= 0 || IO.select([@stdout], nil, nil, remaining).nil?
         silent = line.empty? && @stdout_buffer.empty?
         stop
-        raise(Timeout::Error, silent ? unmatched_package_message : "render process timed out")
+        raise(Timeout::Error, unmatched_package_message) if silent
+
+        raise(Timeout::Error)
       end
 
       begin
