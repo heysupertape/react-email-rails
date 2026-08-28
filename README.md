@@ -435,9 +435,7 @@ end
 
 ### Prop Transformation
 
-Use `prop_transformer` to change props after `as_json` and before they reach React. The default is a no-op, matching [inertia-rails](https://inertia-rails.dev/guide/configuration#prop_transformer).
-
-To work with `snake_case` in Ruby and `camelCase` in components:
+Use `prop_transformer` to change props after `as_json` and before they reach React. To work with `snake_case` in Ruby and `camelCase` in components:
 
 ```ruby
 ReactEmailRails.configure do |config|
