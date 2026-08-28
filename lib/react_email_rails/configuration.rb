@@ -9,13 +9,7 @@ class ReactEmailRails::Configuration
   DEFAULT_RENDER_PROCESS_MAX_REQUESTS = 1_000
   DEFAULT_LIVE_RELOAD_URL = "http://localhost:5173"
 
-  KEY_TRANSFORMS = {
-    camel: ->(key) { key.to_s.camelize },
-    lower_camel: ->(key) { key.to_s.camelize(:lower) },
-    dash: ->(key) { key.to_s.underscore.dasherize },
-    snake: ->(key) { key.to_s.underscore },
-    none: ->(key) { key },
-  }.freeze
+  DEFAULT_PROP_TRANSFORMER = ->(props:) { props }
 
   DEFAULT_RENDER_COMMAND = lambda do
     if Rails.env.development?
@@ -28,13 +22,13 @@ class ReactEmailRails::Configuration
   attr_accessor(
     :component_path_resolver,
     :render_options,
-    :transform_props,
     :on_render_error,
     :deep_merge_shared_props,
     :live_reload_url,
   )
 
   attr_reader(
+    :prop_transformer,
     :render_timeout,
     :render_process_max_requests,
   )
@@ -46,7 +40,7 @@ class ReactEmailRails::Configuration
         config.render_options = {}
         config.render_timeout = Rails.env.development? ? DEVELOPMENT_RENDER_TIMEOUT : DEFAULT_RENDER_TIMEOUT
         config.render_process_max_requests = DEFAULT_RENDER_PROCESS_MAX_REQUESTS
-        config.transform_props = :lower_camel
+        config.prop_transformer = DEFAULT_PROP_TRANSFORMER
         config.on_render_error = nil
         config.deep_merge_shared_props = false
         config.live_reload_url = DEFAULT_LIVE_RELOAD_URL
@@ -58,6 +52,14 @@ class ReactEmailRails::Configuration
     return if live_reload_url.blank?
 
     live_reload_url.to_s.chomp("/")
+  end
+
+  def prop_transformer=(value)
+    unless value.respond_to?(:call)
+      raise(ArgumentError, "react-email-rails prop_transformer must be callable")
+    end
+
+    @prop_transformer = value
   end
 
   def render_timeout=(value)
@@ -84,7 +86,7 @@ class ReactEmailRails::Configuration
         render_options
       end
 
-    deep_transform_keys(value.as_json, KEY_TRANSFORMS.fetch(:lower_camel))
+    camelize_render_option_keys(value.as_json)
   end
 
   private
@@ -94,23 +96,26 @@ class ReactEmailRails::Configuration
   end
 
   def serialize_props(props)
-    deep_transform_keys(props.as_json, key_transform)
+    transform_serialized_props(props.as_json)
   end
 
-  def key_transform
-    transform = transform_props.respond_to?(:to_sym) ? transform_props.to_sym : transform_props
-
-    KEY_TRANSFORMS.fetch(transform) do
-      raise(ArgumentError, "Unknown react-email-rails prop transform: #{transform_props.inspect}")
+  def transform_serialized_props(value)
+    case value
+    when Hash
+      prop_transformer.call(props: value)
+    when Array
+      value.map { |item| transform_serialized_props(item) }
+    else
+      value
     end
   end
 
-  def deep_transform_keys(value, transform)
+  def camelize_render_option_keys(value)
     case value
-    when Array
-      value.map { |item| deep_transform_keys(item, transform) }
     when Hash
-      value.transform_keys { |key| transform.call(key) }.transform_values { |item| deep_transform_keys(item, transform) }
+      value.deep_transform_keys { |key| key.to_s.camelize(:lower) }
+    when Array
+      value.map { |item| camelize_render_option_keys(item) }
     else
       value
     end

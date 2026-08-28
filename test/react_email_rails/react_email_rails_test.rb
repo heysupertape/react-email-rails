@@ -44,7 +44,7 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
     ActiveSupport::Notifications.unsubscribe(subscriber)
   end
 
-  test("render serializes props and camelizes keys before sending them") do
+  test("render serializes props without transforming keys by default") do
     rendered = with_react_email_internals(render_command: ECHO_INPUT) do
       ReactEmailRails.render(
         component: "users/welcome",
@@ -59,26 +59,30 @@ class ReactEmailRailsTest < ActiveSupport::TestCase
       {
         "component" => "users/welcome",
         "props" => {
-          "accountName" => "Ada",
-          "nestedProps" => { "ownerEmail" => "ada@example.com", "tags" => [{ "createdAt" => "today" }] },
+          "account_name" => "Ada",
+          "nested_props" => { "owner_email" => "ada@example.com", "tags" => [{ "created_at" => "today" }] },
         },
       },
       JSON.parse(rendered.html),
     )
   end
 
-  test("render can send props without camelizing keys") do
+  test("render applies prop_transformer before sending props") do
     rendered = with_react_email_internals(render_command: ECHO_INPUT) do
-      with_react_email_config(transform_props: :none) do
+      with_react_email_config(
+        prop_transformer: lambda { |props:|
+          props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
+        },
+      ) do
         ReactEmailRails.render(
           component: "users/welcome",
-          props: { account_name: "Ada", nested_props: { owner_email: "ada@example.com" } },
+          props: { account_name: "Ada", nested_props: { owner_email: "ada@example.com", tags: [{ created_at: "today" }] } },
         )
       end
     end
 
     assert_equal(
-      { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } },
+      { "accountName" => "Ada", "nestedProps" => { "ownerEmail" => "ada@example.com", "tags" => [{ "createdAt" => "today" }] } },
       JSON.parse(rendered.html).fetch("props"),
     )
   end

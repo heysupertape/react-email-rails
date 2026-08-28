@@ -17,42 +17,49 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     Rails.env = previous
   end
 
-  test("defaults prop key transformation to lower camel case") do
-    assert_equal(:lower_camel, ReactEmailRails::Configuration.default.transform_props)
-  end
-
-  test("default prop serialization lower camelizes keys") do
+  test("leaves prop keys as serialized by default") do
     config = ReactEmailRails::Configuration.default
 
-    props = config.send(:serialize_props, account_name: "Ada")
-
-    assert_equal({ "accountName" => "Ada" }, props)
+    assert_equal(
+      { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } },
+      config.send(:serialize_props, account_name: "Ada", nested_props: { owner_email: "ada@example.com" }),
+    )
   end
 
-  test("supports configured prop key transforms") do
+  test("applies a configured prop_transformer after as_json") do
     config = ReactEmailRails::Configuration.default
-    input = { account_name: "Ada", nested_props: { owner_email: "ada@example.com" } }
-    expected = {
-      camel: { "AccountName" => "Ada", "NestedProps" => { "OwnerEmail" => "ada@example.com" } },
-      lower_camel: { "accountName" => "Ada", "nestedProps" => { "ownerEmail" => "ada@example.com" } },
-      dash: { "account-name" => "Ada", "nested-props" => { "owner-email" => "ada@example.com" } },
-      snake: { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } },
-      none: { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } },
-    }
-
-    expected.each do |transform, output|
-      config.transform_props = transform
-      assert_equal(output, config.send(:serialize_props, input))
+    config.prop_transformer = lambda do |props:|
+      props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
     end
+    serializer = Object.new
+    def serializer.as_json(*)
+      { "account_name" => "Ada", "nested_props" => { "owner_email" => "ada@example.com" } }
+    end
+
+    assert_equal(
+      { "accountName" => "Ada", "nestedProps" => { "ownerEmail" => "ada@example.com" } },
+      config.send(:serialize_props, serializer),
+    )
   end
 
-  test("rejects unknown prop key transforms") do
+  test("applies prop_transformer to hashes inside a top-level array") do
     config = ReactEmailRails::Configuration.default
-    config.transform_props = :unknown
+    config.prop_transformer = lambda do |props:|
+      props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
+    end
 
-    error = assert_raises(ArgumentError) { config.send(:serialize_props, account_name: "Ada") }
+    assert_equal(
+      [{ "createdAt" => "today" }, { "ownerEmail" => "ada@example.com" }],
+      config.send(:serialize_props, [{ created_at: "today" }, { owner_email: "ada@example.com" }]),
+    )
+  end
 
-    assert_equal("Unknown react-email-rails prop transform: :unknown", error.message)
+  test("rejects a non-callable prop_transformer") do
+    config = ReactEmailRails::Configuration.default
+
+    error = assert_raises(ArgumentError) { config.prop_transformer = :lower_camel }
+
+    assert_equal("react-email-rails prop_transformer must be callable", error.message)
   end
 
   test("does not expose renderer internals as public configuration writers") do
@@ -64,6 +71,8 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     assert_not_respond_to(config, :render_command=)
     assert_not_respond_to(config, :render_mode=)
     assert_not_respond_to(config, :renderer=)
+    assert_not_respond_to(config, :transform_props=)
+    assert_not_respond_to(config, :camelize_props=)
   end
 
   test("defaults render process recycling to a bounded request count") do
@@ -116,6 +125,16 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     def context.pretty_email? = true
 
     assert_equal({ "html" => { "pretty" => true } }, config.resolve_render_options(context))
+  end
+
+  test("render options that are not a hash pass through without camelizing") do
+    config = ReactEmailRails::Configuration.default
+
+    config.render_options = nil
+    assert_nil(config.resolve_render_options)
+
+    config.render_options = -> { nil }
+    assert_nil(config.resolve_render_options)
   end
 
   test("live reload url defaults to the vite dev server and strips a trailing slash") do

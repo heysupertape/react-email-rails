@@ -170,7 +170,7 @@ class SerializerPropsMailer < ApplicationMailer
     end
 
     def as_json(*)
-      @names.map { |name| { "name" => name } }
+      @names.map { |name| { "full_name" => name } }
     end
   end
 
@@ -254,7 +254,7 @@ class ReactEmailRails::ActionMailerTest < ActiveSupport::TestCase
     request = FakeRenderer.requests.sole
     assert_equal("react_email_test_mailer/assigns", request.component)
     assert_equal({ "name" => "Katherine" }, request.props.except("mailer", "message"))
-    assert_equal("assigns", request.props.dig("mailer", "actionName"))
+    assert_equal("assigns", request.props.dig("mailer", "action_name"))
     assert_equal("Assigns", request.props.dig("message", "subject"))
   end
 
@@ -405,10 +405,10 @@ class ReactEmailRails::MailerContextTest < ActiveSupport::TestCase
     FakeRenderer.requests.sole.props
   end
 
-  test("injects the mailer name and action as the camelized mailer prop") do
+  test("injects the mailer name and action as the mailer prop") do
     props = props_for { MailerContextMailer.basic.message }
 
-    assert_equal({ "mailerName" => "mailer_context_mailer", "actionName" => "basic" }, props["mailer"])
+    assert_equal({ "mailer_name" => "mailer_context_mailer", "action_name" => "basic" }, props["mailer"])
   end
 
   test("injects the message subject and recipients as the message prop") do
@@ -424,13 +424,13 @@ class ReactEmailRails::MailerContextTest < ActiveSupport::TestCase
     props = props_for { MailerContextMailer.basic.message }
 
     assert_equal(["test@example.com"], props["message"]["from"])
-    assert_equal(["noreply@example.com"], props["message"]["replyTo"])
+    assert_equal(["noreply@example.com"], props["message"]["reply_to"])
   end
 
   test("context is injected for react: true with no other props") do
     props = props_for { MailerContextMailer.bare.message }
 
-    assert_equal("bare", props["mailer"]["actionName"])
+    assert_equal("bare", props["mailer"]["action_name"])
     assert_equal("Bare", props["message"]["subject"])
   end
 
@@ -445,14 +445,28 @@ class ReactEmailRails::MailerContextTest < ActiveSupport::TestCase
     props = props_for { SerializerPropsMailer.show.message }
 
     assert_equal("Ada", props["name"])
-    assert_equal("show", props["mailer"]["actionName"])
+    assert_equal("show", props["mailer"]["action_name"])
     assert_equal("Serializer", props["message"]["subject"])
   end
 
   test("collection props flow through without context") do
     props = props_for { SerializerPropsMailer.collection.message }
 
-    assert_equal([{ "name" => "Ada" }, { "name" => "Grace" }], props)
+    assert_equal([{ "full_name" => "Ada" }, { "full_name" => "Grace" }], props)
+  end
+
+  test("collection props apply a hash prop_transformer to each item") do
+    props = with_react_email_config(
+      renderer: FakeRenderer,
+      prop_transformer: lambda { |props:|
+        props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
+      },
+    ) do
+      SerializerPropsMailer.collection.message
+      FakeRenderer.requests.sole.props
+    end
+
+    assert_equal([{ "fullName" => "Ada" }, { "fullName" => "Grace" }], props)
   end
 end
 
@@ -476,7 +490,7 @@ class ReactEmailRails::DefaultReactMailerTest < ActiveSupport::TestCase
     with_react_email_config(renderer: FakeRenderer) { DefaultReactMailer.greet.message }
 
     props = FakeRenderer.requests.sole.props
-    assert_equal({ "mailerName" => "default_react_mailer", "actionName" => "greet" }, props["mailer"])
+    assert_equal({ "mailer_name" => "default_react_mailer", "action_name" => "greet" }, props["mailer"])
     assert_equal("Greet", props["message"]["subject"])
     assert_equal(["ada@example.com"], props["message"]["to"])
   end
@@ -503,7 +517,7 @@ class ReactEmailRails::DefaultReactMailerTest < ActiveSupport::TestCase
     request = FakeRenderer.requests.sole
     assert_equal("default_react_string_mailer/show", request.component)
     assert_equal("Grace", request.props["name"])
-    assert_equal("show", request.props.dig("mailer", "actionName"))
+    assert_equal("show", request.props.dig("mailer", "action_name"))
   end
 
   test("a default react: hash supplies the props inline and still merges context") do

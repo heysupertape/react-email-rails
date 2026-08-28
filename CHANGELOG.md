@@ -3,6 +3,7 @@
 ## 0.12.0
 
 - **Breaking:** Remove `config.render_mode`. There is one renderer: a long-lived Node child per Ruby process, speaking newline-delimited JSON. Delete `config.render_mode = :persistent` from initializers. Set `config.render_process_max_requests = 1` to recycle the child after every email.
+- **Breaking:** Replace `config.transform_props` (`:camel`, `:lower_camel`, `:dash`, `:snake`, `:none`) with `config.prop_transformer`, matching [inertia-rails](https://inertia-rails.dev/guide/configuration#prop_transformer). The default is a no-op (`->(props:) { props }`), so keys stay as `as_json` produced them. Camelize in an initializer if you want the previous 0.11 behavior. The exported `Mailer` and `Message` TypeScript types now describe that default snake_case shape.
 - Render HTML once and derive plain text with `toPlainText`, so `htmlToTextOptions` and `data-skip-in-text` apply to the same markup.
 - Raise clearer errors when a component is missing (including a capped list of known names) or has no default export.
 - Default `render_timeout` to 30 seconds in development so the first Vite-backed render can finish booting.

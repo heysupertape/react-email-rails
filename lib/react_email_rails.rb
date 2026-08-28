@@ -6,6 +6,7 @@ require("active_support/notifications")
 require("active_support/core_ext/object/blank")
 require("active_support/core_ext/object/json")
 require("active_support/core_ext/hash/deep_merge")
+require("active_support/core_ext/hash/keys")
 require("active_support/inflector")
 require("rails/railtie")
 
