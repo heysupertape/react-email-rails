@@ -143,7 +143,7 @@ class ReactEmailRails::Renderer::Child
 
   def drain_stdout_nonblock
     loop { @stdout_buffer << @stdout.read_nonblock(16 * 1024) }
-  rescue IO::WaitReadable, EOFError, IOError, Errno::EAGAIN, Errno::EINTR
+  rescue IO::WaitReadable, IOError, Errno::EAGAIN, Errno::EINTR
     nil
   end
 
