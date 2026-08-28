@@ -112,9 +112,16 @@ class ReactEmailRails::Renderer::Child
 
       remaining = deadline - monotonic_time
       if remaining <= 0 || IO.select([@stdout], nil, nil, remaining).nil?
-        silent = line.empty? && @stdout_buffer.empty?
+        drain_stdout_nonblock
+        if (buffered_line = consume_buffered_response_line)
+          line << buffered_line
+          return line
+        end
+
+        line << @stdout_buffer
+        @stdout_buffer.clear
         stop
-        raise(Timeout::Error, unmatched_package_message) if silent
+        raise(Timeout::Error, unmatched_package_message) if line.empty?
 
         raise(Timeout::Error)
       end
@@ -132,6 +139,12 @@ class ReactEmailRails::Renderer::Child
 
   def unmatched_package_message
     "no response received; gem and npm package react-email-rails must both be #{ReactEmailRails::VERSION}"
+  end
+
+  def drain_stdout_nonblock
+    loop { @stdout_buffer << @stdout.read_nonblock(16 * 1024) }
+  rescue IO::WaitReadable, IOError, Errno::EAGAIN, Errno::EINTR
+    nil
   end
 
   def consume_buffered_response_line

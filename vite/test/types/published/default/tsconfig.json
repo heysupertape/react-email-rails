@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "paths": {
+      "react-email-rails": ["../../../../dist/index.d.ts"],
+      "react-email-rails/runtime": ["../../../../dist/runtime.d.ts"]
+    }
+  },
+  "include": ["../../default/props.ts"]
+}

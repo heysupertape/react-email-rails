@@ -194,9 +194,20 @@ export type {
   EmailModule,
   EmailRegistry,
   EmailRenderOptions,
-  Mailer,
-  Message,
   RenderedEmail,
   RenderRequest,
 } from "./runtime.js"
+export type { CamelMailer, CamelMessage } from "./types.js"
 export { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"
+
+export interface Register {}
+
+type PropKeys = Register extends { propKeys: "camel" } ? "camel" : "snake"
+
+export type Mailer = PropKeys extends "camel"
+  ? import("./types.js").CamelMailer
+  : import("./types.js").SnakeMailer
+
+export type Message = PropKeys extends "camel"
+  ? import("./types.js").CamelMessage
+  : import("./types.js").SnakeMessage
