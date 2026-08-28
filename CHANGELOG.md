@@ -3,6 +3,7 @@
 ## 0.12.1
 
 - Export `CamelMailer` and `CamelMessage` TypeScript types, plus a `Register` module augmentation (`propKeys: "camel"`) so apps that camelize props can type the injected `mailer` / `message` shapes without a local mapped type. Default `Mailer` / `Message` stay snake_case.
+- Timeouts that already received a partial response line no longer suggest a gem/npm version mismatch. The renderer drains stdout before deciding the process was silent.
 
 ## 0.12.0
 

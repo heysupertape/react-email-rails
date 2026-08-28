@@ -46,10 +46,10 @@ class ReactEmailRails::RendererTest < ActiveSupport::TestCase
     RUBY,
     "-e",
     <<~RUBY,
-      $stdin.gets
+      $stdout.sync = true
       $stdout.write("{")
-      $stdout.flush
-      sleep 5
+      $stdin.gets
+      sleep
     RUBY
     "--",
   ].freeze
@@ -294,7 +294,7 @@ class ReactEmailRails::RendererTest < ActiveSupport::TestCase
   test("times out when a response line is incomplete") do
     error = assert_raises(ReactEmailRails::RenderError) do
       with_react_email_internals(render_command: RENDER_PARTIAL_RESPONSE) do
-        with_react_email_config(render_timeout: 0.2) do
+        with_react_email_config(render_timeout: 2) do
           ReactEmailRails.render(component: "users/welcome", props: {})
         end
       end
