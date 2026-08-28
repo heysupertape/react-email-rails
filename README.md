@@ -8,7 +8,7 @@ react-email-rails lets Rails render React Email components into HTML and plain t
 
 ## Why
 
-HTML email is still awkward. React Email gives you a nicer component model, email-safe primitives, Tailwind support, and TypeScript. This gem connects that workflow to Rails without replacing Action Mailer: components render through Vite in development and a prebuilt renderer bundle in production, with optional persistent rendering for high-volume workers.
+HTML email is still awkward. React Email gives you a nicer component model, email-safe primitives, Tailwind support, and TypeScript. This gem connects that workflow to Rails without replacing Action Mailer: components render through Vite in development and a prebuilt renderer bundle in production, using a long-lived Node process per Ruby process.
 
 ## Status
 
@@ -159,11 +159,11 @@ React Email also provides primitives like [`<Button>`, `<Heading>`, `<Tailwind>`
 
 ## Rendering
 
-In development, react-email-rails renders components through Vite's dev pipeline. Your email components get the same module resolution and transforms as the rest of your frontend.
+In development, react-email-rails renders components through Vite's dev pipeline. Your email components get the same module resolution and transforms as the rest of your frontend. A long-lived Node child stays warm across previews and `deliver_now` calls so Vite is not cold-started for every email.
 
-In production, `assets:precompile` builds a server-side renderer bundle from your Vite config. Rails runs that bundle with Node whenever an email needs to render.
+In production, `assets:precompile` builds a server-side renderer bundle from your Vite config. Rails keeps one Node child per Ruby process and renders through that bundle.
 
-Every `react:` email renders HTML and plain text from the same component. If rendering fails, the email is not sent and `ReactEmailRails::RenderError` is raised.
+Every `react:` email renders HTML once and derives plain text from that markup. If rendering fails, the email is not sent and `ReactEmailRails::RenderError` is raised.
 
 ### Live-Reloading Previews
 
@@ -418,7 +418,7 @@ Override Rails-side defaults in `config/initializers/react_email_rails.rb`:
 
 ```ruby
 ReactEmailRails.configure do |config|
-  # config.render_mode = :persistent
+  # config.render_timeout = 10
 end
 ```
 
@@ -426,9 +426,8 @@ end
 |--------|---------|
 | `component_path_resolver` | `->(mailer:, action:) { "#{mailer}/#{action}" }` |
 | `transform_props` | `:lower_camel` |
-| `render_mode` | `:subprocess` |
 | `render_options` | `{}` |
-| `render_timeout` | `10` seconds |
+| `render_timeout` | `30` seconds in development, `10` seconds otherwise |
 | `render_process_max_requests` | `1_000` |
 | `on_render_error` | `nil` |
 | `deep_merge_shared_props` | `false` |
@@ -454,30 +453,21 @@ end
 
 Only prop keys are transformed. Values are always serialized with `as_json`.
 
-### Render Modes
+### Render Process
 
-The default `:subprocess` mode starts a fresh Node process for each render. It is simple, isolated, and always uses the latest bundle, but it pays Node startup and bundle load time for each email.
+Each Ruby process keeps one long-lived Node child. Renders are newline-delimited JSON and processed one at a time. Throughput scales with more worker processes. The child is fork-safe: clustered Puma and forking job runners spawn one Node child per worker.
 
-`:persistent` mode keeps one long-lived Node child process per Ruby process. It is faster for render-heavy workers, but uses more memory and can serve a stale component until the child is recycled.
-
-Switch to persistent mode when Node startup shows up in traces or when a worker renders many emails from the same bundle:
+The child recycles after `render_process_max_requests` renders so a leaked or stale renderer cannot live forever. Set that option to `nil` to disable recycling, or to `1` to start a fresh Node process for every email:
 
 ```ruby
 ReactEmailRails.configure do |config|
-  config.render_mode = :persistent
+  config.render_process_max_requests = 1
 end
 ```
 
-Persistent mode details:
-
-- Renders are newline-delimited JSON and processed one at a time.
-- Throughput scales with more worker processes.
-- It is fork-safe; clustered Puma and forking job runners spawn one Node child per worker.
-- The child recycles after `render_process_max_requests` renders. Set that option to `nil` to disable recycling.
-
 ### Render Options
 
-`render_options` is passed to [@react-email/render](https://react.email/docs/utilities/render). Use `html` and `text` keys to configure each output. Option keys are camelized before they cross into JavaScript, so `html_to_text_options` becomes `htmlToTextOptions`.
+`render_options` is passed to [@react-email/render](https://react.email/docs/utilities/render). HTML is rendered once; plain text is derived from that markup with `toPlainText` (or `unstableToPlainText` when `unstable_text_conversion` is set). `html.pretty` is applied only to the HTML part, so it does not change the text body. `text.html_to_text_options` is forwarded to `toPlainText`. Option keys are camelized before they cross into JavaScript, so `html_to_text_options` becomes `htmlToTextOptions`.
 
 ```ruby
 ReactEmailRails.configure do |config|

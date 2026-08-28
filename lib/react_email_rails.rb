@@ -16,12 +16,8 @@ require_relative("react_email_rails/render_protocol")
 require_relative("react_email_rails/action_mailer")
 require_relative("react_email_rails/render_error")
 require_relative("react_email_rails/rendered_email")
-require_relative("react_email_rails/render_modes")
-require_relative("react_email_rails/render_modes/subprocess")
-require_relative("react_email_rails/render_modes/subprocess/command_runner")
-require_relative("react_email_rails/render_modes/persistent")
-require_relative("react_email_rails/render_modes/persistent/server")
-require_relative("react_email_rails/render_modes/persistent/command_runner")
+require_relative("react_email_rails/renderer")
+require_relative("react_email_rails/renderer/child")
 require_relative("react_email_rails/configuration")
 require_relative("react_email_rails/tasks")
 require_relative("react_email_rails/props_resolver")
@@ -45,7 +41,7 @@ module ReactEmailRails
       payload[:renderOptions] = render_options if render_options.present?
 
       instrument(component:) do
-        configuration.resolved_render_mode.new(payload:, label: component).render
+        renderer_class.new(payload:, label: component).render
       end
     rescue ReactEmailRails::RenderError => e
       configuration.on_render_error&.call(e, component:)
@@ -53,7 +49,7 @@ module ReactEmailRails
     end
 
     def healthy?
-      configuration.resolved_render_mode.healthy?(
+      Renderer.healthy?(
         command: configuration.send(:resolved_render_command),
         timeout: configuration.render_timeout,
       )
@@ -62,6 +58,10 @@ module ReactEmailRails
     end
 
     private
+
+    def renderer_class
+      Renderer
+    end
 
     def serialized_props(value)
       configuration.send(:serialize_props, value)

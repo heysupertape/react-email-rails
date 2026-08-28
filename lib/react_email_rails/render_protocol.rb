@@ -6,10 +6,6 @@ module ReactEmailRails
   module RenderProtocol
     extend(self)
 
-    def healthy_result?(result)
-      result.status.success? && compatible_response?(JSON.parse(result.stdout))
-    end
-
     def compatible_response?(body)
       body["ok"] == true && compatible_metadata?(body)
     end
