@@ -159,7 +159,7 @@ class ReactEmailRails::Renderer::Child
         @stderr_buffer = @stderr_buffer.byteslice(-STDERR_LIMIT, STDERR_LIMIT) if @stderr_buffer.bytesize > STDERR_LIMIT
       end
     end
-  rescue EOFError, IOError
+  rescue IOError
     nil
   end
 
