@@ -1,9 +1,5 @@
-class ReactEmailRails::RenderModes::Persistent::Server
+class ReactEmailRails::Renderer::Child
   STDERR_LIMIT = 8 * 1024
-
-  Status = Data.define(:success) do
-    def success? = success
-  end
 
   def initialize(command)
     @command = command
@@ -14,17 +10,35 @@ class ReactEmailRails::RenderModes::Persistent::Server
     @requests = 0
   end
 
-  def capture(input:, timeout:, max_requests:)
+  def exchange(input, timeout:, max_requests:)
     with_retry_on_broken_pipe do
-      capture_once(input:, timeout:).tap { recycle_if_needed(max_requests) }
+      request(input, timeout:).tap { recycle_if_needed(max_requests) }
     end
   end
 
   def health_check(timeout:)
-    with_retry_on_broken_pipe { health_check_once(timeout:) }
+    with_retry_on_broken_pipe { request(JSON.generate(health: true), timeout:) }
   end
 
   def stop
+    if @mutex.owned?
+      stop_unlocked
+    else
+      @mutex.synchronize { stop_unlocked }
+    end
+  end
+
+  def abandon
+    release_io
+  rescue IOError
+    nil
+  end
+
+  private
+
+  attr_reader(:command)
+
+  def stop_unlocked
     if @wait_thread&.alive?
       terminate_process("TERM", @wait_thread.pid)
       @wait_thread.join(1)
@@ -36,14 +50,6 @@ class ReactEmailRails::RenderModes::Persistent::Server
     @stderr_reader&.kill
     release_io
   end
-
-  def abandon
-    release_io
-  rescue IOError
-    nil
-  end
-
-  private
 
   def release_io
     [@stdin, @stdout, @stderr].compact.each { |io| io.close unless io.closed? }
@@ -58,38 +64,13 @@ class ReactEmailRails::RenderModes::Persistent::Server
     begin
       @mutex.synchronize(&block)
     rescue Errno::EPIPE, IOError
-      failure("render process exited before responding")
+      failed("render process exited before responding")
     end
   end
 
-  attr_reader(:command)
-
-  def capture_once(input:, timeout:)
-    response = request(input, timeout:)
-    return failure(response["error"].to_s.presence || "render process failed") unless response["ok"]
-
-    success(JSON.generate(
-      {
-        protocolVersion: response["protocolVersion"],
-        packageVersion: response["packageVersion"],
-      }.tap do |body|
-        body[:html] = response["html"] if response.key?("html")
-        body[:text] = response["text"] if response.key?("text")
-      end,
-    ))
-  rescue JSON::ParserError => e
-    failure("render process returned invalid JSON: #{e.message}")
-  end
-
-  def health_check_once(timeout:)
-    response = request(JSON.generate(health: true), timeout:)
-    response["ok"] ? success(JSON.generate(response)) : failure(response["error"].to_s.presence || "render process failed")
-  rescue JSON::ParserError => e
-    failure("render process returned invalid JSON: #{e.message}")
-  end
-
   def start
-    @stdin, @stdout, @stderr, @wait_thread = Open3.popen3(*command, "--persistent", pgroup: true)
+    release_io
+    @stdin, @stdout, @stderr, @wait_thread = Open3.popen3(*command, pgroup: true)
     @stderr_buffer = +""
     @stdout_buffer = +""
     @requests = 0
@@ -108,9 +89,12 @@ class ReactEmailRails::RenderModes::Persistent::Server
     @stdin.flush
 
     line = read_response_line(timeout)
-    return { "ok" => false, "error" => "render process exited before responding" } unless line
+    return failed("render process exited before responding") unless line
 
     JSON.parse(line)
+  rescue JSON::ParserError => e
+    stop
+    failed("render process returned invalid JSON: #{e.message}")
   end
 
   def read_response_line(timeout)
@@ -128,7 +112,10 @@ class ReactEmailRails::RenderModes::Persistent::Server
 
       remaining = deadline - monotonic_time
       if remaining <= 0 || IO.select([@stdout], nil, nil, remaining).nil?
+        silent = line.empty? && @stdout_buffer.empty?
         stop
+        raise(Timeout::Error, unmatched_package_message) if silent
+
         raise(Timeout::Error)
       end
 
@@ -139,7 +126,12 @@ class ReactEmailRails::RenderModes::Persistent::Server
       end
     end
   rescue EOFError
+    wait_for_stderr
     line.presence
+  end
+
+  def unmatched_package_message
+    "no response received; gem and npm package react-email-rails must both be #{ReactEmailRails::VERSION}"
   end
 
   def consume_buffered_response_line
@@ -160,7 +152,8 @@ class ReactEmailRails::RenderModes::Persistent::Server
   end
 
   def drain_stderr
-    @stderr.each do |chunk|
+    loop do
+      chunk = @stderr.readpartial(4096)
       @stderr_mutex.synchronize do
         @stderr_buffer << chunk
         @stderr_buffer = @stderr_buffer.byteslice(-STDERR_LIMIT, STDERR_LIMIT) if @stderr_buffer.bytesize > STDERR_LIMIT
@@ -170,20 +163,17 @@ class ReactEmailRails::RenderModes::Persistent::Server
     nil
   end
 
-  def success(stdout)
-    ReactEmailRails::RenderModes::Subprocess::CommandRunner::Result.new(
-      stdout:,
-      stderr: "",
-      status: Status.new(true),
-    )
+  def wait_for_stderr
+    @stderr_reader&.join(1)
   end
 
-  def failure(message)
-    ReactEmailRails::RenderModes::Subprocess::CommandRunner::Result.new(
-      stdout: "",
-      stderr: [message, stderr_buffer].reject(&:blank?).join("\n"),
-      status: Status.new(false),
-    )
+  def failed(message)
+    wait_for_stderr unless @wait_thread&.alive?
+
+    {
+      "ok" => false,
+      "error" => [message, stderr_buffer].reject(&:blank?).join("\n"),
+    }
   end
 
   def stderr_buffer

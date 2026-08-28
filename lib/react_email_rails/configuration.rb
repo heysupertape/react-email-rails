@@ -5,13 +5,9 @@ class ReactEmailRails::Configuration
   DEV_RENDER_BIN = "node_modules/.bin/react-email-rails-dev"
 
   DEFAULT_RENDER_TIMEOUT = 10
+  DEVELOPMENT_RENDER_TIMEOUT = 30
   DEFAULT_RENDER_PROCESS_MAX_REQUESTS = 1_000
   DEFAULT_LIVE_RELOAD_URL = "http://localhost:5173"
-
-  RENDER_MODES = {
-    subprocess: ReactEmailRails::RenderModes::Subprocess,
-    persistent: ReactEmailRails::RenderModes::Persistent,
-  }.freeze
 
   KEY_TRANSFORMS = {
     camel: ->(key) { key.to_s.camelize },
@@ -39,7 +35,6 @@ class ReactEmailRails::Configuration
   )
 
   attr_reader(
-    :render_mode,
     :render_timeout,
     :render_process_max_requests,
   )
@@ -48,9 +43,8 @@ class ReactEmailRails::Configuration
     def default
       new.tap do |config|
         config.component_path_resolver = ->(mailer:, action:) { "#{mailer}/#{action}" }
-        config.render_mode = :subprocess
         config.render_options = {}
-        config.render_timeout = DEFAULT_RENDER_TIMEOUT
+        config.render_timeout = Rails.env.development? ? DEVELOPMENT_RENDER_TIMEOUT : DEFAULT_RENDER_TIMEOUT
         config.render_process_max_requests = DEFAULT_RENDER_PROCESS_MAX_REQUESTS
         config.transform_props = :lower_camel
         config.on_render_error = nil
@@ -66,14 +60,6 @@ class ReactEmailRails::Configuration
     live_reload_url.to_s.chomp("/")
   end
 
-  def render_mode=(value)
-    if (value.is_a?(Symbol) || value.is_a?(String)) && !RENDER_MODES.key?(value.to_sym)
-      raise(ArgumentError, "Unknown react-email-rails render mode: #{value.inspect}")
-    end
-
-    @render_mode = value
-  end
-
   def render_timeout=(value)
     raise(ArgumentError, "react-email-rails render_timeout must be positive") unless value.is_a?(Numeric) && value.positive?
 
@@ -86,14 +72,6 @@ class ReactEmailRails::Configuration
     end
 
     @render_process_max_requests = value
-  end
-
-  def resolved_render_mode
-    return render_mode unless render_mode.is_a?(Symbol) || render_mode.is_a?(String)
-
-    RENDER_MODES.fetch(render_mode.to_sym) do
-      raise(ArgumentError, "Unknown react-email-rails render mode: #{render_mode.inspect}")
-    end
   end
 
   def resolve_render_options(context = nil)

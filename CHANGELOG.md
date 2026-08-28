@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.0
+
+- **Breaking:** Remove `config.render_mode`. There is one renderer: a long-lived Node child per Ruby process, speaking newline-delimited JSON. Delete `config.render_mode = :persistent` from initializers. Set `config.render_process_max_requests = 1` to recycle the child after every email.
+- Render HTML once and derive plain text with `toPlainText`, so `htmlToTextOptions` and `data-skip-in-text` apply to the same markup.
+- Raise clearer errors when a component is missing (including a capped list of known names) or has no default export.
+- Default `render_timeout` to 30 seconds in development so the first Vite-backed render can finish booting.
+- Timeouts with no stdout mention matching gem and npm versions, so a gem 0.12 talking to an older package that waits for EOF is easier to diagnose.
+- Recycle the Node child after invalid JSON so the next render can succeed.
+- Include Node stderr when the child exits without a protocol line, instead of reporting only that it exited.
+- Treat only `{ "health": true }` as a health check so a render payload that also sets `health` still renders.
+- Apply `html.pretty` only to the HTML body so pretty-printing does not change plain text.
+
 ## 0.11.1
 
 - Republish of 0.11.0 with no code changes. The 0.11.0 npm package was never published: npm provenance publishing requires GitHub-hosted runners, so the release workflow's publish job now runs on one. Do not use gem 0.11.0; it has no matching npm package.

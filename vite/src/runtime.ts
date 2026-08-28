@@ -1,4 +1,10 @@
-import { render, type Options as ReactEmailRenderOptions } from "@react-email/render"
+import {
+  pretty as prettyHtml,
+  render,
+  toPlainText,
+  unstableToPlainText,
+  type Options as ReactEmailRenderOptions,
+} from "@react-email/render"
 import React from "react"
 
 import { RENDER_PROTOCOL_VERSION, VERSION } from "./version.js"
@@ -73,78 +79,71 @@ export async function renderEmail(
   registry: EmailRegistry,
 ): Promise<RenderedEmail> {
   const loader = registry[request.component]
-  if (!loader) throw new Error(`React email component not found: ${request.component}`)
+  if (!loader) {
+    throw new Error(
+      `React email component not found: ${request.component}.${missingComponentHint(registry)}`,
+    )
+  }
 
   const mod = typeof loader === "function" ? await loader() : loader
+  if (mod?.default == null) {
+    throw new Error(`React email component ${request.component} must have a default export`)
+  }
+
   const element = React.createElement(mod.default, request.props ?? {})
+  const htmlOptions = request.renderOptions?.html
+  const html = await render(element, {
+    ...htmlOptions,
+    plainText: false,
+    pretty: false,
+  })
+  const textOptions = request.renderOptions?.text
 
   return {
-    html: await render(element, {
-      ...request.renderOptions?.html,
-      plainText: false,
-    }),
-    text: await render(element, {
-      ...request.renderOptions?.text,
-      plainText: true,
-    }),
+    html: htmlOptions?.pretty ? await prettyHtml(html) : html,
+    text: plainTextFromHtml(html, textOptions),
   }
+}
+
+const MISSING_COMPONENT_LIST_LIMIT = 12
+
+function missingComponentHint(registry: EmailRegistry): string {
+  const available = Object.keys(registry).sort()
+  if (available.length === 0) return ""
+
+  const shown = available.slice(0, MISSING_COMPONENT_LIST_LIMIT)
+  const rest = available.length - shown.length
+  const list = rest > 0 ? `${shown.join(", ")}, and ${rest} more` : shown.join(", ")
+  return ` Available components: ${list}`
+}
+
+function plainTextFromHtml(html: string, textOptions: EmailRenderOptions["text"]): string {
+  if (
+    textOptions &&
+    "unstableTextConversion" in textOptions &&
+    textOptions.unstableTextConversion
+  ) {
+    return unstableToPlainText(html)
+  }
+
+  const htmlToTextOptions =
+    textOptions && "htmlToTextOptions" in textOptions ? textOptions.htmlToTextOptions : undefined
+  return toPlainText(html, htmlToTextOptions)
 }
 
 function isHealthRequest(request: unknown): request is HealthRequest {
-  return request !== null && typeof request === "object" && "health" in request
+  if (request === null || typeof request !== "object") return false
+  const value = request as Record<string, unknown>
+  return value.health === true && !("component" in value)
 }
 
 export async function serve(registry: EmailRegistry): Promise<void> {
-  if (process.argv.includes("--persistent")) {
-    await servePersistent(registry, isolateStdout())
-    return
-  }
-
   if (process.argv.includes("--health")) {
     process.stdout.write(JSON.stringify(okResponse()))
     return
   }
 
   const write = isolateStdout()
-  try {
-    const request = JSON.parse(await readStdin()) as RenderRequest
-    write(
-      JSON.stringify({
-        ...(await renderEmail(request, registry)),
-        ...protocolMetadata(),
-      }),
-    )
-  } catch (error) {
-    process.stderr.write(error instanceof Error ? error.message : "React Email render failed")
-    process.exitCode = 1
-  }
-}
-
-function isolateStdout(): (chunk: string) => boolean {
-  const protocolWrite = process.stdout.write.bind(process.stdout)
-  process.stdout.write = ((chunk, encoding, callback) =>
-    typeof encoding === "function"
-      ? process.stderr.write(chunk, encoding)
-      : process.stderr.write(chunk, encoding, callback)) as typeof process.stdout.write
-  return (chunk) => protocolWrite(chunk)
-}
-
-function readStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = ""
-    process.stdin.setEncoding("utf8")
-    process.stdin.on("data", (chunk) => {
-      data += chunk
-    })
-    process.stdin.on("end", () => resolve(data))
-    process.stdin.on("error", reject)
-  })
-}
-
-async function servePersistent(
-  registry: EmailRegistry,
-  write: (chunk: string) => boolean,
-): Promise<void> {
   process.stdin.setEncoding("utf8")
 
   let pending = ""
@@ -156,13 +155,24 @@ async function servePersistent(
       const line = pending.slice(0, separator)
       pending = pending.slice(separator + 1)
 
-      if (line.trim()) await writePersistentResponse(line, registry, write)
+      if (line.trim()) await writeResponse(line, registry, write)
       separator = pending.indexOf("\n")
     }
   }
+
+  if (pending.trim()) await writeResponse(pending, registry, write)
 }
 
-async function writePersistentResponse(
+function isolateStdout(): (chunk: string) => boolean {
+  const protocolWrite = process.stdout.write.bind(process.stdout)
+  process.stdout.write = ((chunk, encoding, callback) =>
+    typeof encoding === "function"
+      ? process.stderr.write(chunk, encoding)
+      : process.stderr.write(chunk, encoding, callback)) as typeof process.stdout.write
+  return (chunk) => protocolWrite(chunk)
+}
+
+async function writeResponse(
   line: string,
   registry: EmailRegistry,
   write: (chunk: string) => boolean,

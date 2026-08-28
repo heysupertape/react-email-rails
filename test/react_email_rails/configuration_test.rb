@@ -1,30 +1,24 @@
 require("test_helper")
 
 class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
-  test("defaults render mode to subprocess") do
+  test("defaults render timeout outside development") do
     config = ReactEmailRails::Configuration.default
 
-    assert_equal(:subprocess, config.render_mode)
-    assert_equal(ReactEmailRails::RenderModes::Subprocess, config.resolved_render_mode)
+    assert_equal(ReactEmailRails::Configuration::DEFAULT_RENDER_TIMEOUT, config.render_timeout)
+  end
+
+  test("defaults a longer render timeout in development") do
+    previous = Rails.env
+    Rails.env = "development"
+    config = ReactEmailRails::Configuration.default
+
+    assert_equal(ReactEmailRails::Configuration::DEVELOPMENT_RENDER_TIMEOUT, config.render_timeout)
+  ensure
+    Rails.env = previous
   end
 
   test("defaults prop key transformation to lower camel case") do
     assert_equal(:lower_camel, ReactEmailRails::Configuration.default.transform_props)
-  end
-
-  test("resolves the persistent render mode shortcut") do
-    config = ReactEmailRails::Configuration.default
-    config.render_mode = :persistent
-
-    assert_equal(ReactEmailRails::RenderModes::Persistent, config.resolved_render_mode)
-  end
-
-  test("rejects unknown render mode shortcuts") do
-    config = ReactEmailRails::Configuration.default
-
-    error = assert_raises(ArgumentError) { config.render_mode = :unknown }
-
-    assert_equal("Unknown react-email-rails render mode: :unknown", error.message)
   end
 
   test("default prop serialization lower camelizes keys") do
@@ -68,9 +62,11 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     assert_not_respond_to(config, :cache_version=)
     assert_not_respond_to(config, :prop_serializer=)
     assert_not_respond_to(config, :render_command=)
+    assert_not_respond_to(config, :render_mode=)
+    assert_not_respond_to(config, :renderer=)
   end
 
-  test("defaults persistent render process recycling to a bounded request count") do
+  test("defaults render process recycling to a bounded request count") do
     assert_equal(1_000, ReactEmailRails::Configuration.default.render_process_max_requests)
   end
 
@@ -81,7 +77,7 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { config.render_timeout = "10" }
   end
 
-  test("allows disabling or tuning persistent render process recycling") do
+  test("allows disabling or tuning render process recycling") do
     config = ReactEmailRails::Configuration.default
 
     config.render_process_max_requests = nil

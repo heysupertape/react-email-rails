@@ -3,12 +3,7 @@ require("fileutils")
 require("rake")
 
 class ReactEmailRails::TasksTest < ActiveSupport::TestCase
-  HEALTH_OK = [
-    RUBY,
-    "-e",
-    "require \"json\"; $stdout.write(JSON.generate(ok: true, #{RENDER_METADATA})) if ARGV.include?(\"--health\")",
-    "--",
-  ].freeze
+  teardown { ReactEmailRails::Renderer.stop_all }
 
   test("build runs the package build command") do
     Dir.mktmpdir do |dir|
@@ -86,7 +81,7 @@ class ReactEmailRails::TasksTest < ActiveSupport::TestCase
   end
 
   test("verify raises with the resolved command when the renderer is unhealthy") do
-    with_react_email_internals(render_command: [RUBY, "-e", "exit 1"]) do
+    with_react_email_internals(render_command: [RUBY, "-e", "exit 1", "--"]) do
       error = assert_raises(RuntimeError) { ReactEmailRails::Tasks.verify }
 
       assert_includes(error.message, "renderer verification failed for command:")

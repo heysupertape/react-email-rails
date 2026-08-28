@@ -71,6 +71,8 @@ describe("renderEmail", () => {
     )
 
     expect(result.html).toContain("\n")
+    expect(result.text).toContain("Hi Ada")
+    expect(result.text).not.toMatch(/\n\s*\n/)
   })
 
   it("throws when the component is not found", async () => {
@@ -78,21 +80,78 @@ describe("renderEmail", () => {
       "component not found: nope/missing",
     )
   })
+
+  it("caps the list of known components when many are registered", async () => {
+    const registry: EmailRegistry = Object.fromEntries(
+      Array.from({ length: 15 }, (_, index) => [`mailer/item_${index}`, { default: Welcome }]),
+    )
+
+    await expect(renderEmail({ component: "nope/missing" }, registry)).rejects.toThrow(
+      /Available components: mailer\/item_0.*and 3 more/,
+    )
+  })
+
+  it("lists known components when the requested one is missing", async () => {
+    const registry: EmailRegistry = { "account_mailer/created": { default: Welcome } }
+
+    await expect(renderEmail({ component: "nope/missing" }, registry)).rejects.toThrow(
+      "Available components: account_mailer/created",
+    )
+  })
+
+  it("derives plain text from the HTML render, honoring htmlToTextOptions", async () => {
+    const Skip: React.ComponentType<Record<string, unknown>> = () =>
+      React.createElement(
+        "div",
+        null,
+        React.createElement("p", null, "Keep me"),
+        React.createElement("p", { "data-skip-in-text": "true" }, "HTML only"),
+        React.createElement("img", { alt: "Logo", src: "https://example.com/logo.png" }),
+      )
+    const registry: EmailRegistry = { "account_mailer/skip": { default: Skip } }
+
+    const result = await renderEmail(
+      {
+        component: "account_mailer/skip",
+        renderOptions: {
+          text: { htmlToTextOptions: { selectors: [{ selector: "img", format: "skip" }] } },
+        },
+      },
+      registry,
+    )
+
+    expect(result.html).toContain("Keep me")
+    expect(result.html).toContain("HTML only")
+    expect(result.text).toContain("Keep me")
+    expect(result.text).not.toContain("HTML only")
+    expect(result.text).not.toContain("Logo")
+  })
+
+  it("throws when the module has no default export", async () => {
+    const registry: EmailRegistry = { "account_mailer/created": { default: undefined as never } }
+
+    await expect(renderEmail({ component: "account_mailer/created" }, registry)).rejects.toThrow(
+      "must have a default export",
+    )
+  })
 })
 
 describe("serve", () => {
-  it("renders newline-delimited requests in persistent mode", async () => {
+  it("renders newline-delimited requests", async () => {
     const registry: EmailRegistry = { "account_mailer/created": { default: Welcome } }
-    const originalArgv = process.argv
     const originalStdin = process.stdin
     const originalStdoutWrite = Reflect.get(process.stdout, "write") as typeof process.stdout.write
     const writes: string[] = []
 
-    process.argv = [...process.argv, "--persistent"]
     Object.defineProperty(process, "stdin", {
       configurable: true,
       value: streamFromChunks([
         `${JSON.stringify({ health: true })}\n`,
+        `${JSON.stringify({
+          health: true,
+          component: "account_mailer/created",
+          props: { name: "Lin" },
+        })}\n`,
         `${JSON.stringify({ component: "account_mailer/created", props: { name: "Ada" } })}\n`,
         `${JSON.stringify({ component: "account_mailer/created", props: { name: "Grace" } })}\n`,
       ]),
@@ -105,7 +164,6 @@ describe("serve", () => {
     try {
       await serve(registry)
     } finally {
-      process.argv = originalArgv
       Object.defineProperty(process, "stdin", { configurable: true, value: originalStdin })
       process.stdout.write = originalStdoutWrite
     }
@@ -115,18 +173,20 @@ describe("serve", () => {
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line))
-    expect(responses).toHaveLength(3)
+    expect(responses).toHaveLength(4)
     expect(responses[0]).toMatchObject({
       ok: true,
       protocolVersion: RENDER_PROTOCOL_VERSION,
       packageVersion: VERSION,
     })
-    expect(responses[1].html).toContain("Hi Ada")
-    expect(responses[1]).toMatchObject({
+    expect(responses[0]).not.toHaveProperty("html")
+    expect(responses[1].html).toContain("Hi Lin")
+    expect(responses[2].html).toContain("Hi Ada")
+    expect(responses[2]).toMatchObject({
       protocolVersion: RENDER_PROTOCOL_VERSION,
       packageVersion: VERSION,
     })
-    expect(responses[2].html).toContain("Hi Grace")
+    expect(responses[3].html).toContain("Hi Grace")
   })
 })
 
@@ -138,14 +198,12 @@ describe("serve stdout isolation", () => {
       return React.createElement("p", null, `Hi ${String(props.name)}`)
     }
     const registry: EmailRegistry = { "x/noisy": { default: Noisy } }
-    const originalArgv = process.argv
     const originalStdin = process.stdin
     const originalStdoutWrite = Reflect.get(process.stdout, "write") as typeof process.stdout.write
     const originalStderrWrite = Reflect.get(process.stderr, "write") as typeof process.stderr.write
     const stdout: string[] = []
     const stderr: string[] = []
 
-    process.argv = [...process.argv, "--persistent"]
     Object.defineProperty(process, "stdin", {
       configurable: true,
       value: streamFromChunks([
@@ -164,7 +222,6 @@ describe("serve stdout isolation", () => {
     try {
       await serve(registry)
     } finally {
-      process.argv = originalArgv
       Object.defineProperty(process, "stdin", { configurable: true, value: originalStdin })
       process.stdout.write = originalStdoutWrite
       process.stderr.write = originalStderrWrite

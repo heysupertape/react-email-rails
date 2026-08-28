@@ -38,7 +38,26 @@ class ActiveSupport::TestCase
   ECHO_INPUT = [
     RUBY,
     "-e",
-    "require \"json\"; $stdout.write(JSON.generate(html: $stdin.read, text: \"\", #{RENDER_METADATA}))",
+    <<~RUBY,
+      require "json"
+      while (line = $stdin.gets)
+        $stdout.puts(JSON.generate(ok: true, html: line.chomp, text: "", #{RENDER_METADATA}))
+        $stdout.flush
+      end
+    RUBY
+    "--",
+  ].freeze
+
+  HEALTH_OK = [
+    RUBY,
+    "-e",
+    <<~RUBY,
+      require "json"
+      request = JSON.parse($stdin.gets)
+      $stdout.puts(JSON.generate(ok: request["health"] == true, #{RENDER_METADATA}))
+      $stdout.flush
+    RUBY
+    "--",
   ].freeze
 
   def write_destination_file(path, content)
@@ -47,12 +66,29 @@ class ActiveSupport::TestCase
     File.write(full_path, content)
   end
 
-  def with_react_email_config(**overrides)
+  def with_react_email_config(renderer: nil, **overrides)
     original = overrides.to_h { |key, _value| [key, ReactEmailRails.configuration.public_send(key)] }
     overrides.each { |key, value| ReactEmailRails.configuration.public_send("#{key}=", value) }
+    stub_renderer(renderer) if renderer
     yield
   ensure
+    restore_renderer if renderer
     original&.each { |key, value| ReactEmailRails.configuration.public_send("#{key}=", value) }
+  end
+
+  def stub_renderer(renderer)
+    redefine_renderer_class(renderer)
+  end
+
+  def restore_renderer
+    redefine_renderer_class(ReactEmailRails::Renderer)
+  end
+
+  def redefine_renderer_class(klass)
+    singleton = class << ReactEmailRails; self; end
+    singleton.silence_redefinition_of_method(:renderer_class)
+    singleton.define_method(:renderer_class) { klass }
+    singleton.send(:private, :renderer_class)
   end
 
   # Each key maps to a private instance method on Configuration; the singleton override

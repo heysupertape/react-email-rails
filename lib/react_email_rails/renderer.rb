@@ -1,12 +1,42 @@
-class ReactEmailRails::RenderModes::Subprocess
+class ReactEmailRails::Renderer
   class << self
     def healthy?(command:, timeout:)
-      result = CommandRunner.capture([*command, "--health"], timeout:)
-      ReactEmailRails::RenderProtocol.healthy_result?(result)
+      body = child_for(command).health_check(timeout:)
+      ReactEmailRails::RenderProtocol.compatible_response?(body)
     rescue StandardError
       false
     end
+
+    def stop_all
+      @mutex.synchronize do
+        @children&.each_value(&:stop)
+        @children&.clear
+      end
+    end
+
+    private
+
+    def exchange(command, input, timeout:, max_requests:)
+      child_for(command).exchange(input, timeout:, max_requests:)
+    end
+
+    def child_for(command)
+      @mutex.synchronize do
+        reset_after_fork
+        @children[command.map(&:to_s)] ||= Child.new(command)
+      end
+    end
+
+    def reset_after_fork
+      return if @owner_pid == Process.pid && @children
+
+      @children&.each_value(&:abandon)
+      @children = {}
+      @owner_pid = Process.pid
+    end
   end
+
+  @mutex = Mutex.new
 
   def initialize(payload:, label:)
     @payload = payload
@@ -14,37 +44,43 @@ class ReactEmailRails::RenderModes::Subprocess
   end
 
   def render
-    run
+    body = exchange
+    raise(render_error(error_message(body["error"]))) unless body["ok"]
+
+    validate_metadata!(body)
+    build_rendered_email(body)
+  rescue KeyError => e
+    raise(render_error("render process returned an invalid response: missing #{e.key.inspect}"))
   end
 
   private
 
   attr_reader(:payload, :label)
 
-  def run
-    result = capture(payload_json)
-    raise(render_error(error_message(result.stderr, result.status))) unless result.status.success?
-
-    body = JSON.parse(result.stdout)
-    validate_metadata!(body)
-    build_rendered_email(body)
-  rescue JSON::ParserError => e
-    raise(render_error("render process returned invalid JSON: #{e.message}"))
-  rescue KeyError => e
-    raise(render_error("render process returned an invalid response: missing #{e.key.inspect}"))
-  end
-
-  def capture(input)
+  def exchange
     with_capture_rescues do
       validate_command!
-      CommandRunner.capture(command, input:, timeout: render_timeout)
+      self.class.send(
+        :exchange,
+        command,
+        payload_json,
+        timeout: render_timeout,
+        max_requests: render_process_max_requests,
+      )
     end
   end
 
   def with_capture_rescues
     yield
-  rescue Timeout::Error
-    raise(render_error("render process timed out after #{render_timeout}s"))
+  rescue Timeout::Error => e
+    detail = e.message
+    suffix =
+      if detail.present? && detail != "Timeout::Error" && detail != "execution expired"
+        " (#{detail})"
+      else
+        ""
+      end
+    raise(render_error("render process timed out after #{render_timeout}s#{suffix}"))
   rescue Errno::ENOENT
     raise(render_error("render command not found: #{command.inspect}"))
   end
@@ -57,12 +93,16 @@ class ReactEmailRails::RenderModes::Subprocess
     ReactEmailRails.configuration.render_timeout
   end
 
+  def render_process_max_requests
+    ReactEmailRails.configuration.render_process_max_requests
+  end
+
   def payload_json
     @payload_json ||= JSON.generate(payload)
   end
 
-  def error_message(stderr, status)
-    stderr.to_s.strip.presence || "render process exited with #{status}"
+  def error_message(message)
+    message.to_s.strip.presence || "render process failed"
   end
 
   def validate_command!
@@ -97,3 +137,5 @@ class ReactEmailRails::RenderModes::Subprocess
     ReactEmailRails::RenderError.new("React Email render failed for #{label}: #{message}")
   end
 end
+
+at_exit { ReactEmailRails::Renderer.stop_all }
