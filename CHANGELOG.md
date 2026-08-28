@@ -8,6 +8,7 @@
 - Default `render_timeout` to 30 seconds in development so the first Vite-backed render can finish booting.
 - Timeouts with no stdout mention matching gem and npm versions, so a gem 0.12 talking to an older package that waits for EOF is easier to diagnose.
 - Recycle the Node child after invalid JSON so the next render can succeed.
+- Include Node stderr when the child exits without a protocol line, instead of reporting only that it exited.
 - Treat only `{ "health": true }` as a health check so a render payload that also sets `health` still renders.
 - Apply `html.pretty` only to the HTML body so pretty-printing does not change plain text.
 

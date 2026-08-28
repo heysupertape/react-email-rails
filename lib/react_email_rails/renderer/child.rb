@@ -126,6 +126,7 @@ class ReactEmailRails::Renderer::Child
       end
     end
   rescue EOFError
+    wait_for_stderr
     line.presence
   end
 
@@ -151,17 +152,24 @@ class ReactEmailRails::Renderer::Child
   end
 
   def drain_stderr
-    @stderr.each do |chunk|
+    loop do
+      chunk = @stderr.readpartial(4096)
       @stderr_mutex.synchronize do
         @stderr_buffer << chunk
         @stderr_buffer = @stderr_buffer.byteslice(-STDERR_LIMIT, STDERR_LIMIT) if @stderr_buffer.bytesize > STDERR_LIMIT
       end
     end
-  rescue IOError
+  rescue EOFError, IOError
     nil
   end
 
+  def wait_for_stderr
+    @stderr_reader&.join(1)
+  end
+
   def failed(message)
+    wait_for_stderr unless @wait_thread&.alive?
+
     {
       "ok" => false,
       "error" => [message, stderr_buffer].reject(&:blank?).join("\n"),
