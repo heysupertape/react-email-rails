@@ -22,19 +22,12 @@ export type RenderRequest = {
   renderOptions?: EmailRenderOptions
 }
 
-export type Mailer = {
-  mailer_name: string
-  action_name: string
-}
-
-export type Message = {
-  subject: string | null
-  to: string[] | null
-  cc: string[] | null
-  bcc: string[] | null
-  from: string[] | null
-  reply_to: string[] | null
-}
+export type {
+  CamelMailer,
+  CamelMessage,
+  SnakeMailer as Mailer,
+  SnakeMessage as Message,
+} from "./types.js"
 
 export type HealthRequest = {
   health: true

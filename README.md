@@ -334,6 +334,8 @@ type WelcomeProps = {
 }
 ```
 
+The table shows the default snake_case keys. Keys follow `config.prop_transformer` just like your own props, so a camelize transformer yields `mailerName` / `replyTo` at runtime. Augment `Register` once so `Mailer` / `Message` match, or alias `CamelMailer` / `CamelMessage` — see [Prop Transformation](#prop-transformation).
+
 | Prop | Example |
 |------|---------|
 | `mailer.mailer_name` | `"account_mailer"` |
@@ -343,9 +345,7 @@ type WelcomeProps = {
 | `message.cc`, `message.bcc` | `["…"]` or `null` |
 | `message.from`, `message.reply_to` | `["app@example.com"]` |
 
-Context is merged before prop serialization, so keys follow `config.prop_transformer` just like your own props. The exported TypeScript types describe the default (untransformed) shape.
-
-Per-mail and shared props win on conflict, so a prop named `mailer` or `message` overrides the injected context. When props come from a serializer, the context is merged in as long as `as_json` returns a hash; collections, arrays, and other non-object values pass through unchanged so their top-level shape is preserved.
+Context is merged before prop serialization. Per-mail and shared props win on conflict, so a prop named `mailer` or `message` overrides the injected context. When props come from a serializer, the context is merged in as long as `as_json` returns a hash; collections, arrays, and other non-object values pass through unchanged so their top-level shape is preserved.
 
 ### Prop Serialization
 
@@ -445,6 +445,29 @@ ReactEmailRails.configure do |config|
     props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
   end
 end
+```
+
+The transformer is arbitrary, so TypeScript cannot infer it. The default `Mailer` and `Message` types stay snake_case (`mailer_name`, `reply_to`). App-authored props (`expiresMinutes`, and so on) stay hand-typed in the app.
+
+If you camelize in Ruby, augment `Register` once so `import type { Mailer, Message }` matches runtime — the same "configure once" idea as the initializer:
+
+```ts
+// e.g. react-email-rails.d.ts
+import "react-email-rails"
+
+declare module "react-email-rails" {
+  interface Register {
+    propKeys: "camel"
+  }
+}
+```
+
+The `import "react-email-rails"` (or an `export {}`) makes the file a module so TypeScript *augments* the package. Without it, a script-style `.d.ts` replaces the module and you lose the rest of the package's types.
+
+If you do not want a `.d.ts`, alias the camel types at the import. `CamelMailer` and `CamelMessage` are always camel, regardless of `Register`:
+
+```ts
+import type { CamelMailer as Mailer, CamelMessage as Message } from "react-email-rails"
 ```
 
 The transformer receives one hash at a time: the root props object, or each object in a top-level collection. Nested hashes inside a single object are left to the transformer — `deep_transform_keys` walks those.
