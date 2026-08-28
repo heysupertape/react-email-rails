@@ -322,7 +322,7 @@ Set `config.deep_merge_shared_props = true` to make deep merging the default for
 
 Every `react:` email receives `mailer` and `message` props, mirroring the [`mailer` and `message` view helpers](https://guides.rubyonrails.org/action_mailer_basics.html#action-mailer-view-helpers) available to Action Mailer ERB views.
 
-`mailer` identifies the mailer action. `message` reflects the email after Action Mailer has assigned headers and defaults, including default `from` and `reply_to` values. With the default prop transform, import the `Mailer` and `Message` types to annotate them:
+`mailer` identifies the mailer action. `message` reflects the email after Action Mailer has assigned headers and defaults, including default `from` and `reply_to` values. Import the `Mailer` and `Message` types to annotate them:
 
 ```tsx
 import type { Mailer, Message } from "react-email-rails"
@@ -336,14 +336,14 @@ type WelcomeProps = {
 
 | Prop | Example |
 |------|---------|
-| `mailer.mailerName` | `"account_mailer"` |
-| `mailer.actionName` | `"welcome"` |
+| `mailer.mailer_name` | `"account_mailer"` |
+| `mailer.action_name` | `"welcome"` |
 | `message.subject` | `"Welcome"` |
 | `message.to` | `["account@example.com"]` |
 | `message.cc`, `message.bcc` | `["…"]` or `null` |
-| `message.from`, `message.replyTo` | `["app@example.com"]` |
+| `message.from`, `message.reply_to` | `["app@example.com"]` |
 
-Context is merged before prop serialization, so keys follow `config.transform_props` just like your own props. The exported TypeScript types describe the default `:lower_camel` shape.
+Context is merged before prop serialization, so keys follow `config.prop_transformer` just like your own props. The exported TypeScript types describe the default (untransformed) shape.
 
 Per-mail and shared props win on conflict, so a prop named `mailer` or `message` overrides the injected context. When props come from a serializer, the context is merged in as long as `as_json` returns a hash; collections, arrays, and other non-object values pass through unchanged so their top-level shape is preserved.
 
@@ -351,7 +351,7 @@ Per-mail and shared props win on conflict, so a prop named `mailer` or `message`
 
 Props are serialized with `as_json`, just like `render json:`. You can pass hashes, arrays, Active Model objects, and serializer output from libraries such as [Alba](https://github.com/okuramasafumi/alba) or [ActiveModel::Serializer](https://github.com/rails-api/active_model_serializers).
 
-Prop keys are camelized by default, so `plan_name` arrives in React as `planName`. See [Prop Transformation](#prop-transformation) to change that behavior.
+Keys are left as serialized by default, so `plan_name` arrives in React as `plan_name`. See [Prop Transformation](#prop-transformation) to camelize them.
 
 ### Component Files
 
@@ -409,7 +409,7 @@ export default function Welcome() {
 
 Configuration lives in two places:
 
-- Rails configuration controls mailer behavior, prop handling, rendering mode, timeouts, and error hooks.
+- Rails configuration controls mailer behavior, prop handling, timeouts, and error hooks.
 - Vite configuration controls email component discovery and the renderer bundle.
 
 ### Rails Configuration
@@ -425,7 +425,7 @@ end
 | Option | Default |
 |--------|---------|
 | `component_path_resolver` | `->(mailer:, action:) { "#{mailer}/#{action}" }` |
-| `transform_props` | `:lower_camel` |
+| `prop_transformer` | `->(props:) { props }` |
 | `render_options` | `{}` |
 | `render_timeout` | `30` seconds in development, `10` seconds otherwise |
 | `render_process_max_requests` | `1_000` |
@@ -435,23 +435,19 @@ end
 
 ### Prop Transformation
 
-Set `transform_props` to choose how Ruby prop keys are exposed to React:
+Use `prop_transformer` to change props after `as_json` and before they reach React. The default is a no-op, matching [inertia-rails](https://inertia-rails.dev/guide/configuration#prop_transformer).
 
-| Value | Example |
-|-------|---------|
-| `:camel` | `AccountName` |
-| `:lower_camel` | `accountName` |
-| `:dash` | `account-name` |
-| `:snake` | `account_name` |
-| `:none` | preserves serialized keys |
+To work with `snake_case` in Ruby and `camelCase` in components:
 
 ```ruby
 ReactEmailRails.configure do |config|
-  config.transform_props = :none
+  config.prop_transformer = lambda do |props:|
+    props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
+  end
 end
 ```
 
-Only prop keys are transformed. Values are always serialized with `as_json`.
+The transformer receives one hash at a time: the root props object, or each object in a top-level collection. Nested hashes inside a single object are left to the transformer — `deep_transform_keys` walks those.
 
 ### Render Process
 

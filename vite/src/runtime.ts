@@ -23,8 +23,8 @@ export type RenderRequest = {
 }
 
 export type Mailer = {
-  mailerName: string
-  actionName: string
+  mailer_name: string
+  action_name: string
 }
 
 export type Message = {
@@ -33,7 +33,7 @@ export type Message = {
   cc: string[] | null
   bcc: string[] | null
   from: string[] | null
-  replyTo: string[] | null
+  reply_to: string[] | null
 }
 
 export type HealthRequest = {
