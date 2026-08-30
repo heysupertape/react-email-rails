@@ -2,7 +2,7 @@
 
 # react-email-rails
 
-Build and send Action Mailer emails with [React Email](https://react.email), TypeScript, and Vite.
+Build and send Action Mailer emails with [React Email](https://react.email), Tailwind, TypeScript, and Vite.
 
 react-email-rails lets Rails render React Email components into HTML and plain text, then deliver them through the Action Mailer stack you already know: previews, headers, callbacks, queues, instrumentation, and delivery all keep working normally.
 
