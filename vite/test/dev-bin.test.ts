@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
@@ -20,6 +20,8 @@ describe("react-email-rails-dev", () => {
 
     mkdirSync(join(root, "app/frontend/emails/account_mailer"), { recursive: true })
     mkdirSync(join(root, "node_modules/cjs-helper"), { recursive: true })
+    // Vite anchors node_modules/.vite to the nearest package.json.
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "app", private: true }))
     writeFileSync(
       join(root, "node_modules/cjs-helper/package.json"),
       JSON.stringify({ name: "cjs-helper", version: "1.0.0", main: "index.cjs" }),
@@ -64,6 +66,18 @@ describe("react-email-rails-dev", () => {
       ].join("\n"),
     )
 
+    const appDepsMetadata = join(root, "node_modules/.vite/deps/_metadata.json")
+    const appDepsCache = JSON.stringify({
+      hash: "app",
+      configHash: "app",
+      lockfileHash: "app",
+      browserHash: "app",
+      optimized: {},
+      chunks: {},
+    })
+    mkdirSync(dirname(appDepsMetadata), { recursive: true })
+    writeFileSync(appDepsMetadata, appDepsCache)
+
     const result = await runDevRenderer(root, {
       component: "account_mailer/created",
       props: { name: "Ada" },
@@ -71,6 +85,7 @@ describe("react-email-rails-dev", () => {
 
     expect(result.html).toContain("from-cjs:Ada")
     expect(result.text).toContain("from-cjs:Ada")
+    expect(readFileSync(appDepsMetadata, "utf8")).toBe(appDepsCache)
   }, 60_000)
 })
 

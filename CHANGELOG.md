@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.2
+
+- The development renderer keeps its Vite cache in `node_modules/.vite/react-email-rails` and skips dependency discovery. It previously reset the app dev server's `node_modules/.vite/deps` on start, so lazily imported dependencies 504ed until that server restarted.
+
 ## 0.12.1
 
 - Export `CamelMailer` and `CamelMessage` TypeScript types, plus a `Register` module augmentation (`propKeys: "camel"`) so apps that camelize props can type the injected `mailer` / `message` shapes without a local mapped type. Default `Mailer` / `Message` stay snake_case.
