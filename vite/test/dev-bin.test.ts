@@ -21,7 +21,10 @@ describe("react-email-rails-dev", () => {
     mkdirSync(join(root, "app/frontend/emails/account_mailer"), { recursive: true })
     mkdirSync(join(root, "node_modules/cjs-helper"), { recursive: true })
     // Vite anchors node_modules/.vite to the nearest package.json.
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "app", private: true }))
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ name: "app", private: true, type: "module" }),
+    )
     writeFileSync(
       join(root, "node_modules/cjs-helper/package.json"),
       JSON.stringify({ name: "cjs-helper", version: "1.0.0", main: "index.cjs" }),
