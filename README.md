@@ -34,11 +34,11 @@ The supported Ruby, Rails, Node, React, and Vite versions are tested in CI. Plea
 | Dependency | Version |
 |------------|---------|
 | Ruby | 3.3+ |
-| Rails | 7.1–8.x |
+| Rails | 7.1+ |
 | Node | 20.19+ |
-| Vite | 7 or 8 |
-| React | 18 or 19 |
-| React Email | 6.x |
+| Vite | 7+ |
+| React | 18+ |
+| React Email | 6+ |
 
 We recommend [rails_vite](https://github.com/skryukov/rails_vite/) for Vite in Rails apps.
 
