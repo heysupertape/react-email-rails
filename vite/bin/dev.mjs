@@ -42,6 +42,9 @@ const server = await createServer(
     configFile: false,
     plugins: [plugin],
     server: { middlewareMode: true },
+    // Stay out of the app dev server's node_modules/.vite/deps.
+    cacheDir: "node_modules/.vite/react-email-rails",
+    optimizeDeps: { noDiscovery: true, include: [] },
     appType: "custom",
     clearScreen: false,
     customLogger: logger,

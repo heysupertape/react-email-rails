@@ -117,7 +117,7 @@ class ReactEmailRails::TasksTest < ActiveSupport::TestCase
     original_bundle_path = ReactEmailRails::Tasks.method(:bundle_path)
     singleton.remove_method(:build_command)
     singleton.remove_method(:bundle_path)
-    singleton.define_method(:build_command) { command }
+    singleton.define_method(:build_command) { [RUBY, command] }
     singleton.define_method(:bundle_path) { bundle }
     singleton.send(:private, :build_command)
     singleton.send(:private, :bundle_path)

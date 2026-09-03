@@ -8,7 +8,7 @@ module ReactEmailRails; end
 module ReactEmailRails::Generators; end
 
 class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
-  CONFIG_BIN = "node_modules/.bin/react-email-rails-config"
+  CONFIG_SCRIPT = "node_modules/react-email-rails/bin/config.mjs"
 
   source_root(File.expand_path("templates/email", __dir__))
 
@@ -120,7 +120,7 @@ class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
       command = vite_config_command
       if command
         stdout, _stderr, status = Timeout.timeout(10) do
-          Open3.capture3(command, chdir: destination_root)
+          Open3.capture3(*command, chdir: destination_root)
         end
 
         status.success? ? JSON.parse(stdout) : {}
@@ -133,10 +133,9 @@ class ReactEmailRails::Generators::EmailGenerator < Rails::Generators::NamedBase
   end
 
   def vite_config_command
-    [
-      CONFIG_BIN,
-      "#{CONFIG_BIN}.cmd",
-    ].find { |path| File.exist?(File.join(destination_root, path)) }
+    return unless File.exist?(File.join(destination_root, CONFIG_SCRIPT))
+
+    [ReactEmailRails.configuration.js_runtime, CONFIG_SCRIPT]
   end
 
   PLUGIN_OPENING = /reactEmailRails\s*\(\s*\{.*?/m

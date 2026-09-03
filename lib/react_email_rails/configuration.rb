@@ -1,23 +1,16 @@
 class ReactEmailRails::Configuration
   BUNDLE_PATH = "tmp/react-email-rails/emails.js"
-  BUILD_BIN = "node_modules/.bin/react-email-rails-build"
-  CONFIG_BIN = "node_modules/.bin/react-email-rails-config"
-  DEV_RENDER_BIN = "node_modules/.bin/react-email-rails-dev"
+  BUILD_SCRIPT = "node_modules/react-email-rails/bin/build.mjs"
+  CONFIG_SCRIPT = "node_modules/react-email-rails/bin/config.mjs"
+  DEV_RENDER_SCRIPT = "node_modules/react-email-rails/bin/dev.mjs"
 
+  DEFAULT_JS_RUNTIME = "node"
   DEFAULT_RENDER_TIMEOUT = 10
   DEVELOPMENT_RENDER_TIMEOUT = 30
   DEFAULT_RENDER_PROCESS_MAX_REQUESTS = 1_000
   DEFAULT_LIVE_RELOAD_URL = "http://localhost:5173"
 
   DEFAULT_PROP_TRANSFORMER = ->(props:) { props }
-
-  DEFAULT_RENDER_COMMAND = lambda do
-    if Rails.env.development?
-      [Rails.root.join(DEV_RENDER_BIN).to_s]
-    else
-      ["node", Rails.root.join(BUNDLE_PATH).to_s]
-    end
-  end
 
   attr_accessor(
     :component_path_resolver,
@@ -28,6 +21,7 @@ class ReactEmailRails::Configuration
   )
 
   attr_reader(
+    :js_runtime,
     :prop_transformer,
     :render_timeout,
     :render_process_max_requests,
@@ -38,6 +32,7 @@ class ReactEmailRails::Configuration
       new.tap do |config|
         config.component_path_resolver = ->(mailer:, action:) { "#{mailer}/#{action}" }
         config.render_options = {}
+        config.js_runtime = DEFAULT_JS_RUNTIME
         config.render_timeout = Rails.env.development? ? DEVELOPMENT_RENDER_TIMEOUT : DEFAULT_RENDER_TIMEOUT
         config.render_process_max_requests = DEFAULT_RENDER_PROCESS_MAX_REQUESTS
         config.prop_transformer = DEFAULT_PROP_TRANSFORMER
@@ -60,6 +55,12 @@ class ReactEmailRails::Configuration
     end
 
     @prop_transformer = value
+  end
+
+  def js_runtime=(value)
+    raise(ArgumentError, "react-email-rails js_runtime must be a non-empty string") unless value.is_a?(String) && value.present?
+
+    @js_runtime = value
   end
 
   def render_timeout=(value)
@@ -92,7 +93,8 @@ class ReactEmailRails::Configuration
   private
 
   def resolved_render_command
-    DEFAULT_RENDER_COMMAND.call
+    script = Rails.env.development? ? DEV_RENDER_SCRIPT : BUNDLE_PATH
+    [js_runtime, Rails.root.join(script).to_s]
   end
 
   def serialize_props(props)

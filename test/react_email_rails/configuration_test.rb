@@ -17,6 +17,38 @@ class ReactEmailRails::ConfigurationTest < ActiveSupport::TestCase
     Rails.env = previous
   end
 
+  test("defaults the JavaScript runtime to node") do
+    assert_equal("node", ReactEmailRails::Configuration.default.js_runtime)
+  end
+
+  test("rejects a blank or non-string JavaScript runtime") do
+    config = ReactEmailRails::Configuration.default
+
+    assert_raises(ArgumentError) { config.js_runtime = "" }
+    assert_raises(ArgumentError) { config.js_runtime = nil }
+    assert_raises(ArgumentError) { config.js_runtime = :bun }
+  end
+
+  test("runs the production bundle and the development renderer with the configured runtime") do
+    config = ReactEmailRails::Configuration.default
+    config.js_runtime = "bun"
+
+    assert_equal(
+      ["bun", Rails.root.join(ReactEmailRails::Configuration::BUNDLE_PATH).to_s],
+      config.send(:resolved_render_command),
+    )
+
+    previous = Rails.env
+    Rails.env = "development"
+
+    assert_equal(
+      ["bun", Rails.root.join(ReactEmailRails::Configuration::DEV_RENDER_SCRIPT).to_s],
+      config.send(:resolved_render_command),
+    )
+  ensure
+    Rails.env = previous
+  end
+
   test("leaves prop keys as serialized by default") do
     config = ReactEmailRails::Configuration.default
 
