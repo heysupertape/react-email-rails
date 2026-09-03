@@ -106,17 +106,16 @@ class ReactEmailRails::Renderer
   end
 
   def validate_command!
-    command_path = command.first.to_s
-    bundle_path = command[1].to_s
+    script = command[1].to_s
+    return if File.file?(script)
 
-    if command_path.end_with?(ReactEmailRails::Configuration::DEV_RENDER_BIN) && !File.exist?(command_path)
-      raise(render_error("development renderer not found at #{command_path.inspect}; install JavaScript dependencies with npm, pnpm, yarn, or bun"))
+    if script.end_with?(ReactEmailRails::Configuration::DEV_RENDER_SCRIPT)
+      raise(render_error("development renderer not found at #{script.inspect}; install JavaScript dependencies with npm, pnpm, yarn, or bun"))
     end
 
-    return unless command_path == "node" && bundle_path.end_with?(ReactEmailRails::Configuration::BUNDLE_PATH)
-    return if File.file?(bundle_path)
+    return unless script.end_with?(ReactEmailRails::Configuration::BUNDLE_PATH)
 
-    raise(render_error("email bundle not found at #{bundle_path.inspect}; run react-email-rails-build before rendering React emails"))
+    raise(render_error("email bundle not found at #{script.inspect}; run react-email-rails-build before rendering React emails"))
   end
 
   def validate_metadata!(body)

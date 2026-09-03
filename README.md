@@ -427,6 +427,7 @@ end
 | `component_path_resolver` | `->(mailer:, action:) { "#{mailer}/#{action}" }` |
 | `prop_transformer` | `->(props:) { props }` |
 | `render_options` | `{}` |
+| `js_runtime` | `"node"` |
 | `render_timeout` | `30` seconds in development, `10` seconds otherwise |
 | `render_process_max_requests` | `1_000` |
 | `on_render_error` | `nil` |
@@ -479,6 +480,14 @@ The child recycles after `render_process_max_requests` renders so a leaked or st
 ```ruby
 ReactEmailRails.configure do |config|
   config.render_process_max_requests = 1
+end
+```
+
+`js_runtime` names the executable that runs the renderer, the build task, and the generator's Vite config probe. It defaults to `node` from `PATH`. Point it at an absolute path when Node lives behind a version manager the app process cannot see, or at another runtime such as `bun`. Only Node is tested in CI:
+
+```ruby
+ReactEmailRails.configure do |config|
+  config.js_runtime = "/usr/local/bin/node"
 end
 ```
 

@@ -4,9 +4,9 @@ module ReactEmailRails::Tasks
   class << self
     def build
       command = build_command
-      raise("react-email-rails build command not found at #{command.inspect}; run JavaScript package install first") unless File.exist?(command)
+      raise("react-email-rails build command not found at #{command.last.inspect}; run JavaScript package install first") unless File.exist?(command.last)
 
-      system(command, exception: true, chdir: Rails.root.to_s)
+      system(*command, exception: true, chdir: Rails.root.to_s)
       raise("react-email-rails build completed, but the email bundle was not found at #{bundle_path.inspect}") unless File.file?(bundle_path)
     end
 
@@ -24,12 +24,10 @@ module ReactEmailRails::Tasks
     private
 
     def build_command
-      candidates = [
-        ReactEmailRails::Configuration::BUILD_BIN,
-        "#{ReactEmailRails::Configuration::BUILD_BIN}.cmd",
+      [
+        ReactEmailRails.configuration.js_runtime,
+        Rails.root.join(ReactEmailRails::Configuration::BUILD_SCRIPT).to_s,
       ]
-      candidates.map { |path| Rails.root.join(path).to_s }.find { |path| File.exist?(path) } ||
-        Rails.root.join(ReactEmailRails::Configuration::BUILD_BIN).to_s
     end
 
     def bundle_path

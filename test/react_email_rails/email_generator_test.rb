@@ -69,12 +69,12 @@ class ReactEmailRails::EmailGeneratorTest < Rails::Generators::TestCase
       RbConfig.ruby,
       "-Ilib",
       "-e",
-      'require "rails/generators"; require "generators/react_email_rails/email_generator"; puts ReactEmailRails::Generators::EmailGenerator::CONFIG_BIN',
+      'require "rails/generators"; require "generators/react_email_rails/email_generator"; puts ReactEmailRails::Generators::EmailGenerator::CONFIG_SCRIPT',
       chdir: File.expand_path("../..", __dir__),
     )
 
     assert(status.success?, stderr)
-    assert_equal("node_modules/.bin/react-email-rails-config", stdout.strip)
+    assert_equal("node_modules/react-email-rails/bin/config.mjs", stdout.strip)
   end
 
   test("allows explicitly overriding the component path and extension") do
