@@ -1,5 +1,5 @@
 import React from "react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { RENDER_PROTOCOL_VERSION, VERSION, reactEmailRails } from "../src/index"
 import { type EmailRegistry, renderEmail, serve, toComponentName } from "../src/runtime"
@@ -139,13 +139,8 @@ describe("renderEmail", () => {
 describe("serve", () => {
   it("renders newline-delimited requests", async () => {
     const registry: EmailRegistry = { "account_mailer/created": { default: Welcome } }
-    const originalStdin = process.stdin
-    const originalStdoutWrite = Reflect.get(process.stdout, "write") as typeof process.stdout.write
-    const writes: string[] = []
-
-    Object.defineProperty(process, "stdin", {
-      configurable: true,
-      value: streamFromChunks([
+    const { stdout } = await withCapturedStdio(
+      [
         `${JSON.stringify({ health: true })}\n`,
         `${JSON.stringify({
           health: true,
@@ -154,21 +149,11 @@ describe("serve", () => {
         })}\n`,
         `${JSON.stringify({ component: "account_mailer/created", props: { name: "Ada" } })}\n`,
         `${JSON.stringify({ component: "account_mailer/created", props: { name: "Grace" } })}\n`,
-      ]),
-    })
-    process.stdout.write = ((chunk: string | Uint8Array) => {
-      writes.push(String(chunk))
-      return true
-    }) as typeof process.stdout.write
+      ],
+      () => serve(registry),
+    )
 
-    try {
-      await serve(registry)
-    } finally {
-      Object.defineProperty(process, "stdin", { configurable: true, value: originalStdin })
-      process.stdout.write = originalStdoutWrite
-    }
-
-    const responses = writes
+    const responses = stdout
       .join("")
       .trim()
       .split("\n")
@@ -198,34 +183,11 @@ describe("serve stdout isolation", () => {
       return React.createElement("p", null, `Hi ${String(props.name)}`)
     }
     const registry: EmailRegistry = { "x/noisy": { default: Noisy } }
-    const originalStdin = process.stdin
-    const originalStdoutWrite = Reflect.get(process.stdout, "write") as typeof process.stdout.write
-    const originalStderrWrite = Reflect.get(process.stderr, "write") as typeof process.stderr.write
-    const stdout: string[] = []
-    const stderr: string[] = []
-
-    Object.defineProperty(process, "stdin", {
-      configurable: true,
-      value: streamFromChunks([
-        `${JSON.stringify({ component: "x/noisy", props: { name: "Ada" } })}\n`,
-      ]),
-    })
-    process.stdout.write = ((chunk: string | Uint8Array) => {
-      stdout.push(String(chunk))
-      return true
-    }) as typeof process.stdout.write
-    process.stderr.write = ((chunk: string | Uint8Array) => {
-      stderr.push(String(chunk))
-      return true
-    }) as typeof process.stderr.write
-
-    try {
-      await serve(registry)
-    } finally {
-      Object.defineProperty(process, "stdin", { configurable: true, value: originalStdin })
-      process.stdout.write = originalStdoutWrite
-      process.stderr.write = originalStderrWrite
-    }
+    const { stdout, stderr } = await withCapturedStdio(
+      [`${JSON.stringify({ component: "x/noisy", props: { name: "Ada" } })}\n`],
+      () => serve(registry),
+      { captureStderr: true },
+    )
 
     const frames = stdout
       .join("")
@@ -540,5 +502,41 @@ function streamFromChunks(chunks: string[]): AsyncIterable<string> & { setEncodi
     async *[Symbol.asyncIterator]() {
       yield* chunks
     },
+  }
+}
+
+async function withCapturedStdio(
+  stdinChunks: string[],
+  run: () => Promise<void>,
+  options?: { captureStderr?: boolean },
+): Promise<{ stdout: string[]; stderr: string[] }> {
+  const originalStdin = process.stdin
+  const stdout: string[] = []
+  const stderr: string[] = []
+  const writeStdout = vi.spyOn(process.stdout, "write").mockImplementation(((
+    chunk: string | Uint8Array,
+  ) => {
+    stdout.push(String(chunk))
+    return true
+  }) as typeof process.stdout.write)
+  const writeStderr = options?.captureStderr
+    ? vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+        stderr.push(String(chunk))
+        return true
+      }) as typeof process.stderr.write)
+    : undefined
+
+  Object.defineProperty(process, "stdin", {
+    configurable: true,
+    value: streamFromChunks(stdinChunks),
+  })
+
+  try {
+    await run()
+    return { stdout, stderr }
+  } finally {
+    Object.defineProperty(process, "stdin", { configurable: true, value: originalStdin })
+    writeStdout.mockRestore()
+    writeStderr?.mockRestore()
   }
 }
