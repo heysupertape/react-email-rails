@@ -11,7 +11,7 @@ bundle install
 cd vite && pnpm install
 ```
 
-The Vite package tests use Vitest 5, which requires Node.js 22.12 or later. The published package still supports Node 20.19+, matching Vite 7 and 8.
+The Vite package tests use Vitest 5. Vitest documents Node.js 22.12+ as required; this repo still runs the suite on Node 20.19+ so the published `engines` range stays covered.
 
 Run the core checks before opening a pull request:
 

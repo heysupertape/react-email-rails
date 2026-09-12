@@ -66,13 +66,7 @@ jobs:
       - run: pnpm add --save-dev vite@${{ matrix.vite }} --allow-build=esbuild
         if: matrix.vite != '8'
         working-directory: vite
-      # Vitest 5 requires Node 22.12+. Node 20 still builds and typechecks the
-      # published package; the test runner and integration suite run on 22+.
       - run: pnpm run ci
-        if: matrix.node != '20'
-        working-directory: vite
-      - run: pnpm run ci:package
-        if: matrix.node == '20'
         working-directory: vite
       - run: pnpm pack --dry-run
         working-directory: vite
