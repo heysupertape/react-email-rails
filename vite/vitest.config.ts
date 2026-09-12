@@ -7,5 +7,8 @@ export default defineConfig({
     clearMocks: true,
     // Promoted out of experimental in 5.0: reuse transforms across local reruns and CI jobs.
     fsModuleCache: true,
+    // Doctor suggests isolate: false (~19% faster). Keep isolation because
+    // serve() tests replace process.stdin/stdout for the render protocol.
+    isolate: true,
   },
 })
