@@ -6,6 +6,7 @@
 /tmp/
 /vite/dist/
 /vite/node_modules/
+/vite/.vitest/
 
 .DS_Store
 *.gem
