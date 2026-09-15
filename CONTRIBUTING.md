@@ -20,6 +20,8 @@ bin/lint
 cd vite && pnpm run build
 ```
 
+Vitest 5 declares Node.js 22.12+ in its own `engines`, but the published package stays on `>=20.19.0` to match Vite's supported range. CI still runs the Vite suite on Node 20 so that range keeps real coverage; the test runner is a dev-only tool and does not constrain consumers. If a future Vitest release starts using APIs that Node 20 lacks, the Node 20 CI jobs are the thing that will break first.
+
 The Ruby gem version in `lib/react_email_rails/version.rb` is the package version source of truth. The renderer protocol version in `lib/react_email_rails/render_protocol.rb` is also synced into the Vite package. Run `cd vite && pnpm run sync:version` after changing either one.
 
 ## Publishing

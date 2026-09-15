@@ -4,6 +4,7 @@
 /node_modules/
 /pkg/
 /tmp/
+/vite/.vitest/
 /vite/dist/
 /vite/node_modules/
 
