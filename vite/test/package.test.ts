@@ -28,8 +28,6 @@ describe("package metadata", () => {
   })
 
   it("keeps the published Node range tied to Vite, not to the test runner", () => {
-    // Vitest 5 asks for Node 22.12+, but that is a dev-only tool. Consumers of the
-    // published package only need the range Vite supports.
     expect(pkg.engines?.node).toBe(">=20.19.0")
   })
 })
