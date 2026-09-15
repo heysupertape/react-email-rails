@@ -44,9 +44,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check:version": "ruby ../scripts/check_version_sync.rb",
-    "lint": "oxlint src test bin vitest.config.ts",
-    "format": "oxfmt src test bin vitest.config.ts",
-    "check:format": "oxfmt --check src test bin vitest.config.ts",
+    "lint": "oxlint src test bin",
+    "format": "oxfmt src test bin",
+    "check:format": "oxfmt --check src test bin",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/types/default/tsconfig.json --noEmit && tsc -p test/types/camel/tsconfig.json --noEmit",
     "typecheck:published": "tsc -p test/types/published/default/tsconfig.json --noEmit && tsc -p test/types/published/camel/tsconfig.json --noEmit",
     "test": "vitest run",
