@@ -9,6 +9,7 @@ const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 describe("package metadata", () => {
   const pkg = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf8")) as {
     dependencies?: Record<string, string>
+    engines?: { node?: string }
     peerDependencies?: Record<string, string>
   }
 
@@ -24,5 +25,9 @@ describe("package metadata", () => {
   it("owns @react-email/render as a runtime dependency, not a peer", () => {
     expect(pkg.dependencies?.["@react-email/render"]).toBe("^2.1.0")
     expect(pkg.peerDependencies).not.toHaveProperty("@react-email/render")
+  })
+
+  it("keeps the published Node range tied to Vite, not to the test runner", () => {
+    expect(pkg.engines?.node).toBe(">=20.19.0")
   })
 })
