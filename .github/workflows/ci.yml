@@ -70,3 +70,16 @@ jobs:
         working-directory: vite
       - run: pnpm pack --dry-run
         working-directory: vite
+
+  # Single required status check for the main ruleset, so Dependabot
+  # auto-merge waits on every matrix job.
+  ci:
+    name: ci
+    needs:
+      - ruby
+      - node
+    if: always()
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - if: needs.ruby.result != 'success' || needs.node.result != 'success'
+        run: exit 1
