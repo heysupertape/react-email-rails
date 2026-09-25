@@ -1,0 +1,34 @@
+name: Dependabot auto-merge
+
+# pull_request_target runs this file from the base branch, so a Dependabot PR
+# that bumps fetch-metadata (or this workflow) cannot execute the updated copy
+# with a write token and merge itself. Never check out the PR head here.
+on:
+  pull_request_target:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 5
+    if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'heysupertape/react-email-rails'
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The ci required status check on main gates the merge.
+      - name: Enable auto-merge for minor and patch groups
+        if: >
+          steps.metadata.outputs.dependency-group == 'npm-minor-patch' ||
+          steps.metadata.outputs.dependency-group == 'bundler-minor-patch' ||
+          steps.metadata.outputs.dependency-group == 'github-actions-minor-patch'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"

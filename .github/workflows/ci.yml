@@ -71,23 +71,15 @@ jobs:
       - run: pnpm pack --dry-run
         working-directory: vite
 
-  dependabot-automerge:
-    name: Dependabot auto-merge
+  # Single required status check for the main ruleset, so Dependabot
+  # auto-merge waits on every matrix job.
+  ci:
+    name: ci
     needs:
       - ruby
       - node
-    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'heysupertape/react-email-rails'
+    if: always()
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
-      - id: metadata
-        uses: dependabot/fetch-metadata@v3
-      # Major bumps stay open for manual review so breaking changes can be adopted.
-      - if: steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.update-type == 'version-update:semver-patch'
-        run: gh pr merge "$PR_URL" --squash --match-head-commit "$HEAD_SHA"
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - if: needs.ruby.result != 'success' || needs.node.result != 'success'
+        run: exit 1

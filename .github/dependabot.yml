@@ -1,50 +1,50 @@
 version: 2
+
+# Groups key on `update-types` only — a `patterns: ["*"]` wildcard has a
+# matching bug that silently empties the group.
+#
+# Minor/patch version updates stay grouped so CI is the review and
+# .github/workflows/dependabot-auto-merge.yml merges them once the ci check
+# passes. Majors are ungrouped (one PR per package) so a breaking bump can be
+# vetted on its own. Security updates stay in their own groups and are not
+# auto-merged.
+
 updates:
   - package-ecosystem: bundler
     directory: /
     schedule:
       interval: weekly
+      day: monday
     groups:
       bundler-minor-patch:
         applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
+        update-types: [minor, patch]
       bundler-security:
         applies-to: security-updates
-        patterns:
-          - "*"
+        update-types: [minor, patch, major]
+
   - package-ecosystem: npm
     directory: /vite
     schedule:
       interval: weekly
+      day: monday
     groups:
       npm-minor-patch:
         applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
+        update-types: [minor, patch]
       npm-security:
         applies-to: security-updates
-        patterns:
-          - "*"
+        update-types: [minor, patch, major]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
     groups:
       github-actions-minor-patch:
         applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
+        update-types: [minor, patch]
       github-actions-security:
         applies-to: security-updates
-        patterns:
-          - "*"
+        update-types: [minor, patch, major]
