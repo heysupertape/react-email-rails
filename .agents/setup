@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Prepares a fresh Amp orb: Ruby (via mise), gems, and the vite package's pnpm deps.
+# Must stay idempotent and fast on a warm (stale snapshot) filesystem.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+# Latest Ruby in the CI matrix; Gemfile.lock is bundled with Bundler 4.
+ruby_version="4.0"
+
+step() {
+  local label="$1"
+  shift
+  local start=$SECONDS
+  echo "==> ${label}"
+  "$@"
+  echo "    ${label} done in $((SECONDS - start))s"
+}
+
+install_mise() {
+  if [[ ! -x "$HOME/.local/bin/mise" ]]; then
+    curl -fsSL https://mise.run | MISE_QUIET=1 sh
+  fi
+}
+
+install_ruby() {
+  # mise installs a precompiled Ruby; this is a no-op when already installed.
+  mise use --global "ruby@${ruby_version}"
+}
+
+persist_path() {
+  # Amp and orb services start in non-interactive login shells; put mise shims on their PATH.
+  local marker="# react-email-rails: mise shims"
+  if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+    cat >>"$HOME/.bash_profile" <<'PROFILE'
+
+# react-email-rails: mise shims
+case ":$PATH:" in
+  *":$HOME/.local/share/mise/shims:"*) ;;
+  *) export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" ;;
+esac
+PROFILE
+  fi
+}
+
+bundle_install() {
+  local gemfile
+  for gemfile in Gemfile gemfiles/rails_8_0.gemfile gemfiles/rails_7_2.gemfile; do
+    echo "    bundle install (${gemfile})"
+    BUNDLE_GEMFILE="$repo_root/$gemfile" bundle check >/dev/null 2>&1 ||
+      BUNDLE_GEMFILE="$repo_root/$gemfile" bundle install --jobs "$(nproc)" --quiet
+  done
+}
+
+pnpm_install() {
+  (cd vite && CI=true pnpm install --frozen-lockfile)
+}
+
+step "Install mise" install_mise
+export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+step "Install Ruby ${ruby_version}" install_ruby
+step "Persist PATH in ~/.bash_profile" persist_path
+step "Install gems" bundle_install
+step "Install vite dependencies" pnpm_install

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Runs whenever an orb wakes. Nothing to reconnect for this repository: no databases or tunnels.
+set -euo pipefail
