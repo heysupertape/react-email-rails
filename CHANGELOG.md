@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0
 
 - **Breaking:** Require Node.js 22.12 or newer. Node 20 is end-of-life and gets no fix for the October 21, 2026 Node.js security releases. Upgrade to a patched release (22.23.4, 24.22.1, or 26.12.1 or newer).
 
