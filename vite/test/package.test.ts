@@ -28,6 +28,6 @@ describe("package metadata", () => {
   })
 
   it("keeps the published Node range tied to Vite, not to the test runner", () => {
-    expect(pkg.engines?.node).toBe(">=20.19.0")
+    expect(pkg.engines?.node).toBe(">=22.12.0")
   })
 })
