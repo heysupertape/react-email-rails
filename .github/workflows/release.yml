@@ -24,12 +24,13 @@ jobs:
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10.34.1
+          version: 10.34.7
           run_install: false
 
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
+          check-latest: true
           package-manager-cache: false
 
       - name: Validate release tag
@@ -73,12 +74,13 @@ jobs:
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10.34.1
+          version: 10.34.7
           run_install: false
 
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
+          check-latest: true
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
