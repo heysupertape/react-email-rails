@@ -56,7 +56,7 @@
     "prepublishOnly": "pnpm run check:version"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "@react-email/render": "^2.1.0"

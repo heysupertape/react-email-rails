@@ -35,7 +35,7 @@ The supported Ruby, Rails, Node, React, and Vite versions are tested in CI. Plea
 |------------|---------|
 | Ruby | 3.3+ |
 | Rails | 7.1+ |
-| Node | 20.19+ |
+| Node | 22.12+ |
 | Vite | 7+ |
 | React | 18+ |
 | React Email | 6+ |
